@@ -1,296 +1,510 @@
-import React, { useState } from 'react';
+// src/pages/Incidents.jsx - UPDATED WITH FORM INTEGRATION
+import React, { useState, useEffect } from 'react';
 import StatCard from '../components/layout/common/StatCard';
-import { AlertCircle, Scale, CheckCircle, Timer, Eye, Send, MoreVertical, Download, Plus, FileText, List } from 'lucide-react';
+import IncidentFormModal from '../components/incidents/IncidentFormModal';
+import {
+  AlertCircle,
+  Scale,
+  CheckCircle,
+  Timer,
+  Eye,
+  Send,
+  MoreVertical,
+  Download,
+  Plus,
+  FileText,
+  List,
+  ShieldAlert,
+  Lock,
+  Volume2,
+  Home,
+  AlertTriangle,
+  Search,
+  MapPin,
+  Loader,
+  X,
+  Edit
+} from 'lucide-react';
+import { useIncidents } from '../hooks/useIncidents';
 
-export default function Incidents() {
+const Incidents = () => {
+  const {
+    incidents,
+    loading,
+    error,
+    stats,
+    hasMore,
+    loadIncidents,
+    loadMore,
+    search,
+    loadByStatus,
+    loadStatistics,
+    clearError
+  } = useIncidents();
+
   const [activeFilter, setActiveFilter] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('All categories');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [editingIncident, setEditingIncident] = useState(null);
 
-  const incidents = [
-    {
-      id: 1,
-      caseNumber: 'INC-2024-087',
-      category: 'Dispute',
-      categoryColor: 'bg-gray-100 text-gray-700',
-      complainant: {
-        name: 'Laparan',
-        purok: 'Purok 3',
-        initial: 'L',
-        color: 'bg-blue-500'
-      },
-      location: 'Purok 3, Zone A',
-      dateFiled: 'Dec 2, 2024',
-      status: 'Open',
-      statusColor: 'bg-red-100 text-red-700'
-    },
-    {
-      id: 2,
-      caseNumber: 'INC-2024-086',
-      category: 'Theft',
-      categoryColor: 'bg-red-100 text-red-700',
-      complainant: {
-        name: 'David',
-        purok: 'Purok 1',
-        initial: 'D',
-        color: 'bg-pink-500'
-      },
-      location: 'Purok 1, Main St.',
-      dateFiled: 'Dec 1, 2024',
-      status: 'Under Mediation',
-      statusColor: 'bg-blue-100 text-blue-700'
-    },
-    {
-      id: 3,
-      caseNumber: 'INC-2024-085',
-      category: 'Noise Complaint',
-      categoryColor: 'bg-orange-100 text-orange-700',
-      complainant: {
-        name: 'Villafranca',
-        purok: 'Purok 5',
-        initial: 'V',
-        color: 'bg-purple-500'
-      },
-      location: 'Purok 5, Block 2',
-      dateFiled: 'Nov 30, 2024',
-      status: 'Resolved',
-      statusColor: 'bg-green-100 text-green-700'
-    },
-    {
-      id: 4,
-      caseNumber: 'INC-2024-084',
-      category: 'Property Issue',
-      categoryColor: 'bg-purple-100 text-purple-700',
-      complainant: {
-        name: 'Limosnero',
-        purok: 'Purok 2',
-        initial: 'L',
-        color: 'bg-orange-500'
-      },
-      location: 'Purok 2, Lot 15',
-      dateFiled: 'Nov 29, 2024',
-      status: 'Under Mediation',
-      statusColor: 'bg-blue-100 text-blue-700'
-    },
-    {
-      id: 5,
-      caseNumber: 'INC-2024-083',
-      category: 'Others',
-      categoryColor: 'bg-gray-100 text-gray-700',
-      complainant: {
-        name: 'Araneta',
-        purok: 'Purok 4',
-        initial: 'A',
-        color: 'bg-green-500'
-      },
-      location: 'Purok 4, Zone C',
-      dateFiled: 'Nov 28, 2024',
-      status: 'Open',
-      statusColor: 'bg-red-100 text-red-700'
-    }
-  ];
+  // Load incidents and stats on mount
+  useEffect(() => {
+    loadIncidents(50, true);
+    loadStatistics();
+  }, []);
 
   const filterButtons = [
-    { id: 'all', label: 'All Requests', icon: List },
-    { id: 'open', label: 'Open', icon: FileText },
-    { id: 'mediation', label: 'Mediation', icon: Scale },
-    { id: 'resolved', label: 'Resolved', icon: CheckCircle }
+    { id: 'all', label: 'All Cases', icon: List },
+    { id: 'Open', label: 'Open', icon: FileText },
+    { id: 'Under Mediation', label: 'Mediation', icon: Scale },
+    { id: 'Resolved', label: 'Resolved', icon: CheckCircle }
   ];
 
-  const getCategoryIcon = (category) => {
-    switch (category) {
-      case 'Dispute':
-        return '⚖️';
-      case 'Theft':
-        return '🔒';
-      case 'Noise Complaint':
-        return '🔊';
-      case 'Property Issue':
-        return '🏠';
-      default:
-        return '⚠️';
+  // Handle filter change
+  const handleFilterChange = async (filterId) => {
+    setActiveFilter(filterId);
+    
+    if (filterId === 'all') {
+      await loadIncidents(50, true);
+    } else {
+      await loadByStatus(filterId);
     }
   };
 
+  // Handle search
+  const handleSearch = async (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+
+    if (value.trim() === '') {
+      await loadIncidents(50, true);
+    } else {
+      // Debounce search
+      clearTimeout(window.searchTimeout);
+      window.searchTimeout = setTimeout(async () => {
+        await search(value, {
+          status: activeFilter !== 'all' ? activeFilter : undefined,
+          category: selectedCategory !== 'All categories' ? selectedCategory : undefined
+        });
+      }, 500);
+    }
+  };
+
+  // Handle category change
+  const handleCategoryChange = async (e) => {
+    const category = e.target.value;
+    setSelectedCategory(category);
+
+    if (searchQuery.trim() !== '') {
+      await search(searchQuery, {
+        status: activeFilter !== 'all' ? activeFilter : undefined,
+        category: category !== 'All categories' ? category : undefined
+      });
+    } else if (activeFilter !== 'all') {
+      await loadByStatus(activeFilter);
+    } else {
+      await loadIncidents(50, true);
+    }
+  };
+
+  // Handle actions
+  const handleView = (incident) => {
+    alert(`Viewing Case: ${incident.caseNumber}\n\nComplainant: ${incident.complainant.name}\nCategory: ${incident.category}\nLocation: ${incident.location}\nStatus: ${incident.status}`);
+  };
+
+  const handleEdit = (incident) => {
+    setEditingIncident(incident);
+    setShowFormModal(true);
+  };
+
+  const handleSendSummon = (incident) => {
+    alert(`Sending summon for case ${incident.caseNumber} to ${incident.complainant.name}`);
+  };
+
+  const handleMore = (incident) => {
+    alert(`More options for case ${incident.caseNumber}`);
+  };
+
+  const handleNewIncident = () => {
+    setEditingIncident(null);
+    setShowFormModal(true);
+  };
+
+  const handleFormSuccess = () => {
+    loadIncidents(50, true);
+    loadStatistics();
+  };
+
+  const handleFormClose = () => {
+    setShowFormModal(false);
+    setEditingIncident(null);
+  };
+
+  // Get category icon
+  const getCategoryIcon = (categoryType) => {
+    switch (categoryType) {
+      case 'dispute': return Scale;
+      case 'theft': return Lock;
+      case 'noise': return Volume2;
+      case 'property': return Home;
+      default: return AlertTriangle;
+    }
+  };
+
+  // Format date
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    
+    // Handle Firestore Timestamp
+    let date;
+    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+      date = timestamp.toDate();
+    } else if (timestamp.seconds) {
+      date = new Date(timestamp.seconds * 1000);
+    } else {
+      date = new Date(timestamp);
+    }
+    
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  // Get avatar background
+  const getAvatarBg = (color) => {
+    const colors = {
+      primary: '#3b82f6',
+      error: '#ef4444',
+      secondary: '#8b5cf6',
+      warning: '#f59e0b',
+      success: '#10b981'
+    };
+    return colors[color] || colors.primary;
+  };
+
   return (
-    <div className="p-6 bg-gray-50 min-h-full">
+    <div className="page-container">
       {/* Page Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Incident & Blotter Management</h2>
-          <p className="text-gray-600 text-sm mt-1">Track and manage barangay incidents and disputes</p>
+      <div className="page-header">
+        <div className="page-header-content">
+          <h1 className="page-title">Incident & Blotter Management</h1>
+          <p className="page-subtitle">Track and manage barangay incidents and disputes</p>
         </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-sm">
-          <Plus className="w-4 h-4" />
+        <button className="btn btn-primary btn-md" onClick={handleNewIncident}>
+          <Plus size={18} strokeWidth={2} />
           New Incident Report
         </button>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <StatCard
-          title="Open Cases"
-          value="8"
-          icon={AlertCircle}
-          iconBg="bg-red-100"
-          iconColor="text-red-600"
-          badge="Requires attention"
-          badgeColor="text-red-600"
-        />
-        <StatCard
-          title="Under Mediation"
-          value="5"
-          icon={Scale}
-          iconBg="bg-blue-100"
-          iconColor="text-blue-600"
-          badge="Lupon processing"
-          badgeColor="text-blue-600"
-        />
-        <StatCard
-          title="Resolved (Month)"
-          value="42"
-          icon={CheckCircle}
-          iconBg="bg-green-100"
-          iconColor="text-green-600"
-          badge="18% from last month"
-          badgeColor="text-green-600"
-          badgeIcon="↑"
-        />
-        <StatCard
-          title="Avg. Resolution"
-          value="4.2"
-          icon={Timer}
-          iconBg="bg-purple-100"
-          iconColor="text-purple-600"
-          badge="Days per case"
-          badgeColor="text-gray-600"
-        />
-      </div>
-
-      {/* Filters and Table */}
-      <div className="bg-white rounded-xl shadow-sm">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {filterButtons.map(btn => {
-                const Icon = btn.icon;
-                return (
-                  <button
-                    key={btn.id}
-                    onClick={() => setActiveFilter(btn.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                      activeFilter === btn.id
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {btn.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-3">
-              <select 
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
-              >
-                <option>All categories</option>
-                <option>Dispute</option>
-                <option>Theft</option>
-                <option>Noise Complaint</option>
-                <option>Property Issue</option>
-                <option>Others</option>
-              </select>
-              <button className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-2">
-                <Download className="w-4 h-4" />
-                Export
+      {/* Error Alert */}
+      {error && (
+        <div className="card" style={{ 
+          background: 'var(--color-error-light)', 
+          border: '1px solid var(--color-error)', 
+          marginBottom: 'var(--space-6)' 
+        }}>
+          <div className="card-body">
+            <div className="d-flex align-center justify-between">
+              <div className="d-flex align-center gap-3">
+                <AlertCircle size={24} style={{ color: 'var(--color-error)' }} />
+                <div>
+                  <h4 className="fw-semibold" style={{ color: 'var(--color-error)' }}>Error</h4>
+                  <p className="text-secondary">{error}</p>
+                </div>
+              </div>
+              <button className="btn-icon" onClick={clearError}>
+                <X size={20} />
               </button>
             </div>
           </div>
         </div>
+      )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+      {/* Stats Grid */}
+      <div className="stats-grid">
+        <StatCard
+          title="Open Cases"
+          value={stats?.open?.toLocaleString() || '0'}
+          icon={AlertCircle}
+          iconBg="icon-bg-error"
+          badge="Requires attention"
+          badgeColor="badge-error"
+        />
+        <StatCard
+          title="Under Mediation"
+          value={stats?.underMediation?.toLocaleString() || '0'}
+          icon={Scale}
+          iconBg="icon-bg-primary"
+          badge="Lupon processing"
+          badgeColor="badge-primary"
+        />
+        <StatCard
+          title="Resolved (Month)"
+          value={stats?.resolved?.toLocaleString() || '0'}
+          icon={CheckCircle}
+          iconBg="icon-bg-success"
+          badge="↑ This month"
+          badgeColor="badge-success"
+        />
+        <StatCard
+          title="Total Cases"
+          value={stats?.total?.toLocaleString() || '0'}
+          icon={Timer}
+          iconBg="icon-bg-secondary"
+          badge="All time"
+          badgeColor="badge-gray"
+        />
+      </div>
+
+      {/* Filters */}
+      <div className="filters-section">
+        <div className="filter-buttons-group">
+          {filterButtons.map(btn => {
+            const Icon = btn.icon;
+            return (
+              <button
+                key={btn.id}
+                onClick={() => handleFilterChange(btn.id)}
+                disabled={loading}
+                className={`filter-btn ${activeFilter === btn.id ? 'active' : ''}`}
+              >
+                <Icon size={18} strokeWidth={1.5} />
+                {btn.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="action-buttons-group">
+          <div style={{ position: 'relative', minWidth: '200px' }}>
+            <Search
+              size={18}
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--color-text-tertiary)'
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Search cases..."
+              value={searchQuery}
+              onChange={handleSearch}
+              disabled={loading}
+              className="form-input"
+              style={{ paddingLeft: '40px' }}
+            />
+          </div>
+          <select
+            value={selectedCategory}
+            onChange={handleCategoryChange}
+            disabled={loading}
+            className="form-select"
+            style={{ minWidth: '150px' }}
+          >
+            <option>All categories</option>
+            <option>Dispute</option>
+            <option>Theft</option>
+            <option>Noise Complaint</option>
+            <option>Property Issue</option>
+            <option>Others</option>
+          </select>
+          <button className="btn btn-secondary btn-md" disabled={loading}>
+            <Download size={18} strokeWidth={1.5} />
+            Export
+          </button>
+        </div>
+      </div>
+
+      {/* Data Table */}
+      <div className="data-table-card">
+        <div className="table-container">
+          <table className="data-table">
+            <thead>
               <tr>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Case #</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Category</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Complainant</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Location</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Date Filed</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Status</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Actions</th>
+                <th>Case #</th>
+                <th>Category</th>
+                <th>Complainant</th>
+                <th>Location</th>
+                <th>Date Filed</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {incidents.map((incident) => (
-                <tr key={incident.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="py-4 px-6 text-sm font-medium text-blue-600">
-                    {incident.caseNumber}
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{getCategoryIcon(incident.category)}</span>
-                      <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${incident.categoryColor}`}>
-                        {incident.category}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 ${incident.complainant.color} rounded-full flex items-center justify-center text-white font-semibold`}>
-                        {incident.complainant.initial}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">{incident.complainant.name}</p>
-                        <p className="text-sm text-gray-500">{incident.complainant.purok}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6 text-sm text-gray-600">{incident.location}</td>
-                  <td className="py-4 px-6 text-sm text-gray-600">{incident.dateFiled}</td>
-                  <td className="py-4 px-6">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${incident.statusColor}`}>
-                      {incident.status}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-2">
-                      <button className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button className="text-purple-600 hover:bg-purple-50 p-2 rounded-lg transition-colors">
-                        <Send className="w-4 h-4" />
-                      </button>
-                      <button className="text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors">
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
+            <tbody>
+              {loading && incidents.length === 0 ? (
+                <tr>
+                  <td colSpan="7">
+                    <div className="empty-state">
+                      <Loader className="empty-state-icon animate-spin" />
+                      <h3 className="empty-state-title">Loading incidents...</h3>
+                      <p className="empty-state-description">Please wait</p>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : incidents.length > 0 ? (
+                incidents.map((incident) => {
+                  const CategoryIcon = getCategoryIcon(incident.categoryType);
+                  
+                  return (
+                    <tr key={incident.id}>
+                      <td>
+                        <span className="fw-semibold text-primary">
+                          {incident.caseNumber}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="d-flex align-center gap-2">
+                          <div
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: 'var(--radius-md)',
+                              background: 'var(--color-bg-tertiary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--color-text-secondary)'
+                            }}
+                          >
+                            <CategoryIcon size={16} />
+                          </div>
+                          <span className="badge badge-gray">
+                            {incident.category}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="user-info-cell">
+                          <div
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: 'var(--radius-full)',
+                              background: getAvatarBg(incident.complainant.color),
+                              color: 'white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 600,
+                              fontSize: 'var(--font-size-sm)'
+                            }}
+                          >
+                            {incident.complainant.initial}
+                          </div>
+                          <div className="user-details">
+                            <span className="user-name">{incident.complainant.name}</span>
+                            <span className="user-meta">{incident.complainant.purok}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="d-flex align-center gap-1 text-secondary">
+                          <MapPin size={14} />
+                          <span style={{ fontSize: 'var(--font-size-sm)' }}>
+                            {incident.location}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="text-secondary">{formatDate(incident.systemInfo?.dateFiled)}</td>
+                      <td>
+                        <span className={`status-badge status-${incident.status.toLowerCase().replace(' ', '-')}`}>
+                          {incident.status}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="d-flex align-center gap-2">
+                          <button
+                            className="btn-icon btn-icon-sm"
+                            onClick={() => handleView(incident)}
+                            title="View Details"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
+                            className="btn-icon btn-icon-sm"
+                            onClick={() => handleEdit(incident)}
+                            title="Edit Incident"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            className="btn-icon btn-icon-sm"
+                            onClick={() => handleSendSummon(incident)}
+                            title="Send Summon"
+                            style={{ color: 'var(--color-secondary)' }}
+                          >
+                            <Send size={16} />
+                          </button>
+                          <button
+                            className="btn-icon btn-icon-sm"
+                            onClick={() => handleMore(incident)}
+                            title="More Options"
+                          >
+                            <MoreVertical size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="7">
+                    <div className="empty-state">
+                      <AlertCircle className="empty-state-icon" />
+                      <h3 className="empty-state-title">No incidents found</h3>
+                      <p className="empty-state-description">
+                        {searchQuery ? 'Try adjusting your search criteria' : 'Click "New Incident Report" to get started'}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-          <p className="text-sm text-gray-600">Showing 1 to 5 of 87 incidents</p>
-          <div className="flex items-center gap-2">
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              Previous
-            </button>
-            <button className="px-3 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg">1</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">2</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">3</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">...</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              Next
-            </button>
+        {incidents.length > 0 && (
+          <div className="pagination-container">
+            <p className="pagination-info">
+              Showing {incidents.length} incident{incidents.length !== 1 ? 's' : ''}
+              {stats?.total ? ` of ${stats.total} total` : ''}
+            </p>
+            {hasMore && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={loadMore}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader size={16} className="animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  'Load More'
+                )}
+              </button>
+            )}
           </div>
-        </div>
+        )}
       </div>
+
+      {/* Incident Form Modal */}
+      <IncidentFormModal
+        isOpen={showFormModal}
+        onClose={handleFormClose}
+        incident={editingIncident}
+        onSuccess={handleFormSuccess}
+      />
     </div>
   );
-}
+};
+
+export default Incidents;

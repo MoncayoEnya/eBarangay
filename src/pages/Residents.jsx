@@ -1,63 +1,50 @@
-import React, { useState } from 'react';
+// src/pages/Residents.jsx - UPDATED WITH FIREBASE
+import React, { useState, useEffect } from 'react';
 import StatCard from '../components/layout/common/StatCard';
-import { Users, UserCheck, Eye, Edit, Filter, Download, Plus, Vote } from 'lucide-react';
+import {
+  Users,
+  UserCheck,
+  Eye,
+  Edit,
+  Filter,
+  Download,
+  Plus,
+  Vote,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Loader,
+  AlertCircle,
+  X
+} from 'lucide-react';
+import { useResidents } from '../hooks/useResidents';
 
-export default function Residents() {
+const Residents = () => {
+  const {
+    residents,
+    loading,
+    error,
+    stats,
+    hasMore,
+    loadResidents,
+    loadMore,
+    search,
+    loadByCategory,
+    loadStatistics,
+    remove,
+    clearError
+  } = useResidents();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedResident, setSelectedResident] = useState(null);
 
-  const residents = [
-    {
-      id: 1,
-      name: 'Juan Dela Cruz',
-      gender: 'Male',
-      address: 'Purok 1, Block 5, Lot 12',
-      contact: '0917-123-4567',
-      age: 45,
-      status: 'Active',
-      tags: []
-    },
-    {
-      id: 2,
-      name: 'Maria Santos',
-      gender: 'Female',
-      address: 'Purok 2, Block 3, Lot 8',
-      contact: '0928-234-5678',
-      age: 38,
-      status: 'Active',
-      tags: []
-    },
-    {
-      id: 3,
-      name: 'Pedro Reyes',
-      gender: 'Male',
-      address: 'Purok 3, Block 7, Lot 15',
-      contact: '0939-345-6789',
-      age: 67,
-      status: 'Active',
-      tags: ['Senior']
-    },
-    {
-      id: 4,
-      name: 'Ana Garcia',
-      gender: 'Female',
-      address: 'Purok 1, Block 2, Lot 20',
-      contact: '0945-456-7890',
-      age: 29,
-      status: 'Active',
-      tags: []
-    },
-    {
-      id: 5,
-      name: 'Roberto Mendoza',
-      gender: 'Male',
-      address: 'Purok 4, Block 1, Lot 5',
-      contact: '0956-567-8901',
-      age: 52,
-      status: 'Active',
-      tags: ['PWD']
-    }
-  ];
+  // Load residents and stats on mount
+  useEffect(() => {
+    loadResidents(10, true);
+    loadStatistics();
+  }, []);
 
   const filterButtons = [
     { id: 'all', label: 'All Residents', icon: Users },
@@ -66,178 +53,366 @@ export default function Residents() {
     { id: 'voters', label: 'Voters', icon: Vote }
   ];
 
+  // Handle filter change
+  const handleFilterChange = async (filterId) => {
+    setActiveFilter(filterId);
+    
+    if (filterId === 'all') {
+      await loadResidents(10, true);
+    } else {
+      await loadByCategory(filterId);
+    }
+  };
+
+  // Handle search
+  const handleSearch = async (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+
+    if (value.trim() === '') {
+      await loadResidents(10, true);
+    } else {
+      // Debounce search
+      clearTimeout(window.searchTimeout);
+      window.searchTimeout = setTimeout(async () => {
+        await search(value, {
+          status: 'Active'
+        });
+      }, 500);
+    }
+  };
+
+  // Handle view resident
+  const handleView = (resident) => {
+    setSelectedResident(resident);
+    // TODO: Open view modal
+    alert(`Viewing: ${resident.personalInfo.firstName} ${resident.personalInfo.lastName}`);
+  };
+
+  // Handle edit resident
+  const handleEdit = (resident) => {
+    setSelectedResident(resident);
+    // TODO: Open edit modal
+    alert(`Editing: ${resident.personalInfo.firstName} ${resident.personalInfo.lastName}`);
+  };
+
+  // Handle delete resident
+  const handleDelete = async (resident) => {
+    if (window.confirm(`Are you sure you want to deactivate ${resident.personalInfo.firstName} ${resident.personalInfo.lastName}?`)) {
+      const result = await remove(resident.id);
+      if (result.success) {
+        alert('Resident deactivated successfully');
+      } else {
+        alert('Failed to deactivate resident: ' + result.error);
+      }
+    }
+  };
+
+  const handleExport = () => {
+    alert('Exporting residents data...');
+    // TODO: Implement export functionality
+  };
+
+  // Helper function to format full name
+  const getFullName = (personalInfo) => {
+    const { firstName, middleName, lastName, suffix } = personalInfo;
+    return `${firstName} ${middleName} ${lastName}${suffix ? ' ' + suffix : ''}`.trim();
+  };
+
+  // Helper function to get avatar URL or initials
+  const getAvatarDisplay = (resident) => {
+    if (resident.documents?.profilePhoto) {
+      return resident.documents.profilePhoto;
+    }
+    // Return initials as fallback
+    const initials = `${resident.personalInfo.firstName[0]}${resident.personalInfo.lastName[0]}`;
+    return `https://ui-avatars.com/api/?name=${initials}&background=3b82f6&color=fff`;
+  };
+
   return (
-    <div className="p-6 bg-gray-50 min-h-full">
+    <div className="page-container">
       {/* Page Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Residents Management</h2>
-          <p className="text-gray-600 text-sm mt-1">Manage and view all resident information</p>
+      <div className="page-header">
+        <div className="page-header-content">
+          <h1 className="page-title">Residents Management</h1>
+          <p className="page-subtitle">Manage and view all resident information</p>
         </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-sm">
-          <Plus className="w-4 h-4" />
+        <button className="btn btn-primary btn-md" onClick={() => setShowAddModal(true)}>
+          <Plus size={18} strokeWidth={2} />
           Add New Resident
         </button>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <StatCard
-          title="Total Residents"
-          value="8,547"
-          icon={Users}
-          iconBg="bg-blue-100"
-          iconColor="text-blue-600"
-          badge="2.5% this month"
-          badgeColor="text-green-600"
-          badgeIcon="↑"
-        />
-        <StatCard
-          title="Senior Citizens"
-          value="1,234"
-          icon={UserCheck}
-          iconBg="bg-purple-100"
-          iconColor="text-purple-600"
-          badge="14.4% of total"
-          badgeColor="text-gray-600"
-        />
-        <StatCard
-          title="PWD Residents"
-          value="342"
-          icon={Users}
-          iconBg="bg-orange-100"
-          iconColor="text-orange-600"
-          badge="4% of total"
-          badgeColor="text-gray-600"
-        />
-        <StatCard
-          title="Registered Voters"
-          value="5,892"
-          icon={Vote}
-          iconBg="bg-green-100"
-          iconColor="text-green-600"
-          badge="68.9% of total"
-          badgeColor="text-gray-600"
-        />
-      </div>
-
-      {/* Filters and Table */}
-      <div className="bg-white rounded-xl shadow-sm">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              {filterButtons.map(btn => {
-                const Icon = btn.icon;
-                return (
-                  <button
-                    key={btn.id}
-                    onClick={() => setActiveFilter(btn.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                      activeFilter === btn.id
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {btn.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-3">
-              <button className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-2">
-                <Filter className="w-4 h-4" />
-                Filter
-              </button>
-              <button className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-2">
-                <Download className="w-4 h-4" />
-                Export
+      {/* Error Alert */}
+      {error && (
+        <div className="card" style={{ 
+          background: 'var(--color-error-light)', 
+          border: '1px solid var(--color-error)', 
+          marginBottom: 'var(--space-6)' 
+        }}>
+          <div className="card-body">
+            <div className="d-flex align-center justify-between">
+              <div className="d-flex align-center gap-3">
+                <AlertCircle size={24} style={{ color: 'var(--color-error)' }} />
+                <div>
+                  <h4 className="fw-semibold" style={{ color: 'var(--color-error)' }}>Error</h4>
+                  <p className="text-secondary">{error}</p>
+                </div>
+              </div>
+              <button className="btn-icon" onClick={clearError}>
+                <X size={20} />
               </button>
             </div>
           </div>
         </div>
+      )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+      {/* Stats Grid */}
+      <div className="stats-grid">
+        <StatCard
+          title="Total Residents"
+          value={stats?.total?.toLocaleString() || '0'}
+          icon={Users}
+          iconBg="icon-bg-primary"
+          badge={loading ? 'Loading...' : `${stats?.male || 0} M / ${stats?.female || 0} F`}
+          badgeColor="badge-success"
+        />
+        <StatCard
+          title="Senior Citizens"
+          value={stats?.seniorCitizens?.toLocaleString() || '0'}
+          icon={UserCheck}
+          iconBg="icon-bg-secondary"
+          badge={stats?.total ? `${((stats.seniorCitizens / stats.total) * 100).toFixed(1)}% of total` : '0%'}
+          badgeColor="badge-gray"
+        />
+        <StatCard
+          title="PWD Residents"
+          value={stats?.pwd?.toLocaleString() || '0'}
+          icon={Users}
+          iconBg="icon-bg-warning"
+          badge={stats?.total ? `${((stats.pwd / stats.total) * 100).toFixed(1)}% of total` : '0%'}
+          badgeColor="badge-gray"
+        />
+        <StatCard
+          title="Registered Voters"
+          value={stats?.voters?.toLocaleString() || '0'}
+          icon={Vote}
+          iconBg="icon-bg-success"
+          badge={stats?.total ? `${((stats.voters / stats.total) * 100).toFixed(1)}% of total` : '0%'}
+          badgeColor="badge-gray"
+        />
+      </div>
+
+      {/* Filters and Search */}
+      <div className="filters-section">
+        <div className="filter-buttons-group">
+          {filterButtons.map(btn => {
+            const Icon = btn.icon;
+            return (
+              <button
+                key={btn.id}
+                onClick={() => handleFilterChange(btn.id)}
+                disabled={loading}
+                className={`filter-btn ${activeFilter === btn.id ? 'active' : ''}`}
+              >
+                <Icon size={18} strokeWidth={1.5} />
+                {btn.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="action-buttons-group">
+          <div style={{ position: 'relative', minWidth: '250px' }}>
+            <Search
+              size={18}
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--color-text-tertiary)'
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Search residents..."
+              value={searchQuery}
+              onChange={handleSearch}
+              disabled={loading}
+              className="form-input"
+              style={{ paddingLeft: '40px' }}
+            />
+          </div>
+          <button className="btn btn-secondary btn-md" disabled={loading}>
+            <Filter size={18} strokeWidth={1.5} />
+            Filter
+          </button>
+          <button className="btn btn-secondary btn-md" onClick={handleExport} disabled={loading}>
+            <Download size={18} strokeWidth={1.5} />
+            Export
+          </button>
+        </div>
+      </div>
+
+      {/* Data Table */}
+      <div className="data-table-card">
+        <div className="table-container">
+          <table className="data-table">
+            <thead>
               <tr>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Resident Name</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Address</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Contact</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Age</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Status</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Actions</th>
+                <th>Resident Name</th>
+                <th>Address</th>
+                <th>Contact</th>
+                <th>Age</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {residents.map((resident) => (
-                <tr key={resident.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={`https://ui-avatars.com/api/?name=${resident.name}&background=3b82f6&color=fff`}
-                        alt={resident.name}
-                        className="w-10 h-10 rounded-full"
-                      />
-                      <div>
-                        <p className="font-medium text-gray-800">{resident.name}</p>
-                        <p className="text-sm text-gray-500">{resident.gender}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6 text-sm text-gray-600">{resident.address}</td>
-                  <td className="py-4 px-6 text-sm text-gray-600">{resident.contact}</td>
-                  <td className="py-4 px-6 text-sm text-gray-600">{resident.age}</td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-2">
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                        {resident.status}
-                      </span>
-                      {resident.tags.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            tag === 'Senior' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
-                          }`}
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-2">
-                      <button className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button className="text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors">
-                        <Edit className="w-4 h-4" />
-                      </button>
+            <tbody>
+              {loading && residents.length === 0 ? (
+                <tr>
+                  <td colSpan="6">
+                    <div className="empty-state">
+                      <Loader className="empty-state-icon animate-spin" />
+                      <h3 className="empty-state-title">Loading residents...</h3>
+                      <p className="empty-state-description">Please wait</p>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : residents.length > 0 ? (
+                residents.map((resident) => (
+                  <tr key={resident.id}>
+                    <td>
+                      <div className="user-info-cell">
+                        <img
+                          src={getAvatarDisplay(resident)}
+                          alt={getFullName(resident.personalInfo)}
+                          className="avatar"
+                        />
+                        <div className="user-details">
+                          <span className="user-name">
+                            {getFullName(resident.personalInfo)}
+                          </span>
+                          <span className="user-meta">
+                            {resident.personalInfo.gender}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="text-secondary">{resident.address.fullAddress}</td>
+                    <td className="text-secondary">{resident.contactInfo.mobileNumber || 'N/A'}</td>
+                    <td className="text-secondary">{resident.personalInfo.age}</td>
+                    <td>
+                      <div className="d-flex align-center gap-2">
+                        <span className={`status-badge status-${resident.systemInfo.status.toLowerCase()}`}>
+                          {resident.systemInfo.status}
+                        </span>
+                        {resident.statusFlags.isSeniorCitizen && (
+                          <span className="badge badge-secondary">Senior</span>
+                        )}
+                        {resident.statusFlags.isPWD && (
+                          <span className="badge badge-warning">PWD</span>
+                        )}
+                        {resident.statusFlags.isVoter && (
+                          <span className="badge badge-primary">Voter</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="d-flex align-center gap-2">
+                        <button
+                          className="btn-icon btn-icon-sm"
+                          onClick={() => handleView(resident)}
+                          title="View Details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          className="btn-icon btn-icon-sm"
+                          onClick={() => handleEdit(resident)}
+                          title="Edit Resident"
+                        >
+                          <Edit size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6">
+                    <div className="empty-state">
+                      <Users className="empty-state-icon" />
+                      <h3 className="empty-state-title">No residents found</h3>
+                      <p className="empty-state-description">
+                        {searchQuery ? 'Try adjusting your search criteria' : 'Click "Add New Resident" to get started'}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-          <p className="text-sm text-gray-600">Showing 1 to 5 of 8,547 residents</p>
-          <div className="flex items-center gap-2">
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              Previous
-            </button>
-            <button className="px-3 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg">1</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">2</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">3</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">...</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              Next
-            </button>
+        {residents.length > 0 && (
+          <div className="pagination-container">
+            <p className="pagination-info">
+              Showing {residents.length} resident{residents.length !== 1 ? 's' : ''}
+              {stats?.total ? ` of ${stats.total} total` : ''}
+            </p>
+            {hasMore && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={loadMore}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader size={16} className="animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    Load More
+                    <ChevronRight size={16} />
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Add Resident Modal (placeholder) */}
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Add New Resident</h3>
+              <button className="btn-icon" onClick={() => setShowAddModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="text-secondary">
+                Add resident form will be implemented in the next step...
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary">
+                Add Resident
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
-}
+};
+
+export default Residents;

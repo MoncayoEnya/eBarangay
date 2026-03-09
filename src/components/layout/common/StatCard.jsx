@@ -1,32 +1,50 @@
 import React from 'react';
 
-export default function StatCard({
-  title,
-  value,
-  icon: Icon,
-  iconBg,
-  iconColor,
+/**
+ * StatCard Component
+ * Modern, reusable statistics card with icon and badge
+ * 
+ * @param {string} title - Card title
+ * @param {string|number} value - Main statistic value
+ * @param {React.Component} icon - Icon component (from lucide-react)
+ * @param {string} iconBg - Icon background class (e.g., 'icon-bg-primary')
+ * @param {string} badge - Badge text
+ * @param {string} badgeColor - Badge color class
+ * @param {function} onClick - Optional click handler
+ */
+const StatCard = ({ 
+  title, 
+  value, 
+  icon: Icon, 
+  iconBg = 'icon-bg-primary',
   badge,
-  badgeColor,
-  badgeIcon
-}) {
+  badgeColor = 'badge-primary',
+  onClick 
+}) => {
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-gray-500 text-sm font-medium mb-1">{title}</p>
-          <h3 className="text-3xl font-bold text-gray-800">{value}</h3>
+    <div 
+      className="stat-card" 
+      onClick={onClick}
+      style={{ cursor: onClick ? 'pointer' : 'default' }}
+    >
+      <div className="stat-card-content">
+        <div className="stat-card-info">
+          <p className="stat-card-label">{title}</p>
+          <h3 className="stat-card-value">{value}</h3>
           {badge && (
-            <p className={`text-sm mt-2 flex items-center gap-1.5 ${badgeColor}`}>
-              {badgeIcon && <span className="text-xs">{badgeIcon}</span>}
+            <div className={`stat-card-badge ${badgeColor}`}>
               <span>{badge}</span>
-            </p>
+            </div>
           )}
         </div>
-        <div className={`w-14 h-14 ${iconBg} rounded-xl flex items-center justify-center shrink-0`}>
-          <Icon className={`w-6 h-6 ${iconColor}`} />
-        </div>
+        {Icon && (
+          <div className={`stat-icon-wrapper ${iconBg}`}>
+            <Icon size={24} strokeWidth={2} />
+          </div>
+        )}
       </div>
     </div>
   );
-}
+};
+
+export default StatCard;

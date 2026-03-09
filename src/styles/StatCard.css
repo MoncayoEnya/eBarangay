@@ -1,0 +1,144 @@
+/* StatCard Component - Clean & Modern */
+
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+  border: 1px solid #f1f5f9;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card-content {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-title {
+  font-size: 0.875rem;
+  color: #64748b;
+  font-weight: 500;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.01em;
+}
+
+.stat-value {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 0.5rem 0;
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.stat-badge {
+  display: inline-block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0;
+}
+
+.stat-badge.text-green-600 {
+  color: #059669;
+}
+
+.stat-badge.text-gray-600 {
+  color: #64748b;
+}
+
+.stat-badge.text-red-600 {
+  color: #dc2626;
+}
+
+/* Icon Wrapper */
+.stat-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.stat-card:hover .stat-icon-wrapper {
+  transform: scale(1.05);
+}
+
+/* Background Colors */
+.bg-blue-100 {
+  background: #dbeafe;
+}
+
+.bg-purple-100 {
+  background: #e9d5ff;
+}
+
+.bg-orange-100 {
+  background: #fed7aa;
+}
+
+.bg-green-100 {
+  background: #d1fae5;
+}
+
+.bg-red-100 {
+  background: #fee2e2;
+}
+
+.bg-yellow-100 {
+  background: #fef3c7;
+}
+
+/* Text Colors */
+.text-blue-600 {
+  color: #2563eb;
+}
+
+.text-purple-600 {
+  color: #9333ea;
+}
+
+.text-orange-600 {
+  color: #ea580c;
+}
+
+.text-green-600 {
+  color: #059669;
+}
+
+.text-red-600 {
+  color: #dc2626;
+}
+
+.text-yellow-600 {
+  color: #d97706;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .stat-card {
+    padding: 1.25rem;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+  }
+
+  .stat-icon-wrapper {
+    width: 40px;
+    height: 40px;
+  }
+}

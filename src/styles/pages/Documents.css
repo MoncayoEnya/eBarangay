@@ -1,0 +1,444 @@
+/* Documents Page - Clean & Modern UI */
+
+.documents-page {
+  padding: 1.5rem;
+  background: #f8fafc;
+  min-height: 100vh;
+}
+
+/* Page Header */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+  letter-spacing: -0.025em;
+}
+
+.page-subtitle {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+  font-weight: 400;
+}
+
+/* Primary Button */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #3b82f6;
+  color: white;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.btn-primary:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Content Card */
+.content-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+/* Filters Section */
+.filters-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.filter-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.filter-btn.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+.action-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-btn.secondary {
+  background: white;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.action-btn.secondary:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+/* Table Container */
+.table-container {
+  overflow-x: auto;
+}
+
+/* Documents Table */
+.documents-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.documents-table thead th {
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.875rem 1.5rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.documents-table tbody tr {
+  transition: background 0.15s ease;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.documents-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.documents-table tbody td {
+  padding: 1rem 1.5rem;
+  font-size: 0.875rem;
+}
+
+/* Request ID */
+.request-id {
+  font-weight: 600;
+  color: #3b82f6;
+  font-size: 0.875rem;
+}
+
+/* Resident Cell */
+.resident-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.resident-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.resident-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.resident-name {
+  font-weight: 500;
+  color: #1e293b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.resident-contact {
+  font-size: 0.8125rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Document Type */
+.document-type {
+  color: #64748b;
+}
+
+.text-secondary {
+  color: #64748b;
+}
+
+/* Status Badge - Clean Design */
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+
+.status-badge.pending {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.status-badge.approved {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.status-badge.denied {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Table Action Buttons - Clean Icon Buttons */
+.action-icons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: #64748b;
+}
+
+.icon-btn:hover {
+  background: #f1f5f9;
+}
+
+.icon-btn-view:hover {
+  background: #dbeafe;
+  color: #3b82f6;
+}
+
+.icon-btn-approve:hover {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.icon-btn-deny:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.icon-btn-print:hover {
+  background: #e9d5ff;
+  color: #9333ea;
+}
+
+.icon-btn-download:hover {
+  background: #dbeafe;
+  color: #3b82f6;
+}
+
+.icon-btn-info:hover {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* Pagination */
+.pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.pagination-info {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pagination-btn {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 36px;
+}
+
+.pagination-btn:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.pagination-btn.active {
+  background: #3b82f6;
+  color: white;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .documents-page {
+    padding: 1rem;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .filters-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-buttons-group {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .filter-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .action-buttons-group {
+    width: 100%;
+  }
+
+  .action-btn.secondary {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .documents-table thead th,
+  .documents-table tbody td {
+    padding: 0.75rem 1rem;
+  }
+
+  .pagination-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pagination-buttons {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .documents-table {
+    font-size: 0.8125rem;
+  }
+
+  .resident-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .pagination-btn {
+    padding: 0.375rem 0.625rem;
+    font-size: 0.8125rem;
+  }
+}

@@ -1,0 +1,480 @@
+/* ============================================
+   ANIMATIONS & MICRO-INTERACTIONS
+   Make Your UI More Lively & Engaging
+   ============================================ */
+
+/* ===== ENTRANCE ANIMATIONS ===== */
+
+/* Fade In */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Slide In from Bottom */
+@keyframes slideInBottom {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-in-bottom {
+  animation: slideInBottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Slide In from Right */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.slide-in-right {
+  animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Scale In */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.scale-in {
+  animation: scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ===== HOVER ANIMATIONS ===== */
+
+/* Lift Effect */
+.hover-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+}
+
+/* Grow Effect */
+.hover-grow {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-grow:hover {
+  transform: scale(1.05);
+}
+
+/* Glow Effect */
+.hover-glow {
+  transition: all 0.3s ease;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+}
+
+/* Shine Effect */
+@keyframes shine {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+  }
+}
+
+.shine-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.shine-effect::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  animation: shine 3s infinite;
+}
+
+/* ===== PULSE ANIMATIONS ===== */
+
+/* Subtle Pulse */
+@keyframes pulse-subtle {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.95;
+  }
+}
+
+.pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* Pulse Ring */
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+.pulse-ring {
+  animation: pulse-ring 2s ease-in-out infinite;
+}
+
+/* ===== BOUNCE ANIMATIONS ===== */
+
+@keyframes bounce-soft {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.bounce-soft {
+  animation: bounce-soft 2s ease-in-out infinite;
+}
+
+/* ===== SHAKE ANIMATION ===== */
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-5px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(5px);
+  }
+}
+
+.shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* ===== LOADING ANIMATIONS ===== */
+
+/* Spinner */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+/* Dots Loading */
+@keyframes dots-pulse {
+  0%, 80%, 100% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.dots-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dots-loading span {
+  width: 8px;
+  height: 8px;
+  background: #3b82f6;
+  border-radius: 50%;
+  animation: dots-pulse 1.4s infinite ease-in-out;
+}
+
+.dots-loading span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dots-loading span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Progress Bar */
+@keyframes progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.progress-bar {
+  position: relative;
+  overflow: hidden;
+  background: #e5e7eb;
+  border-radius: 10px;
+  height: 4px;
+}
+
+.progress-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  animation: progress 1.5s ease-in-out infinite;
+}
+
+/* ===== NOTIFICATION ANIMATIONS ===== */
+
+@keyframes slide-in-notification {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.notification-enter {
+  animation: slide-in-notification 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ===== STAGGER ANIMATIONS ===== */
+
+.stagger-item {
+  opacity: 0;
+  animation: fadeIn 0.4s ease-in forwards;
+}
+
+.stagger-item:nth-child(1) { animation-delay: 0.1s; }
+.stagger-item:nth-child(2) { animation-delay: 0.2s; }
+.stagger-item:nth-child(3) { animation-delay: 0.3s; }
+.stagger-item:nth-child(4) { animation-delay: 0.4s; }
+.stagger-item:nth-child(5) { animation-delay: 0.5s; }
+.stagger-item:nth-child(6) { animation-delay: 0.6s; }
+.stagger-item:nth-child(7) { animation-delay: 0.7s; }
+.stagger-item:nth-child(8) { animation-delay: 0.8s; }
+
+/* ===== FLIP ANIMATIONS ===== */
+
+@keyframes flip {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(180deg);
+  }
+}
+
+.flip {
+  animation: flip 0.6s ease-in-out;
+}
+
+/* ===== WAVE ANIMATION ===== */
+
+@keyframes wave {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(20deg);
+  }
+  75% {
+    transform: rotate(-15deg);
+  }
+}
+
+.wave {
+  animation: wave 1s ease-in-out infinite;
+  transform-origin: 70% 70%;
+}
+
+/* ===== TYPING INDICATOR ===== */
+
+@keyframes typing {
+  0%, 80%, 100% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  padding: 12px;
+}
+
+.typing-indicator span {
+  width: 8px;
+  height: 8px;
+  background: #6b7280;
+  border-radius: 50%;
+  animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* ===== GRADIENT ANIMATIONS ===== */
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.gradient-animated {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+/* ===== FLOATING ANIMATION ===== */
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.floating {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* ===== ATTENTION SEEKERS ===== */
+
+/* Heartbeat */
+@keyframes heartbeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  10%, 30% {
+    transform: scale(1.1);
+  }
+  20%, 40% {
+    transform: scale(1);
+  }
+}
+
+.heartbeat {
+  animation: heartbeat 1.5s ease-in-out infinite;
+}
+
+/* Wiggle */
+@keyframes wiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-5deg);
+  }
+  75% {
+    transform: rotate(5deg);
+  }
+}
+
+.wiggle {
+  animation: wiggle 0.5s ease-in-out;
+}
+
+/* ===== SMOOTH TRANSITIONS ===== */
+
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.transition-fast {
+  transition: all 0.15s ease;
+}
+
+.transition-slow {
+  transition: all 0.5s ease;
+}
+
+/* ===== ACCESSIBILITY ===== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ===== UTILITY CLASSES ===== */
+
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-500 { animation-delay: 0.5s; }
+.delay-1000 { animation-delay: 1s; }
+
+.duration-100 { animation-duration: 0.1s; }
+.duration-200 { animation-duration: 0.2s; }
+.duration-300 { animation-duration: 0.3s; }
+.duration-500 { animation-duration: 0.5s; }
+.duration-1000 { animation-duration: 1s; }

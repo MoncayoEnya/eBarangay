@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { sidebarNav } from '../../data/sidebarNav.js';
 
+import '../../styles/Sidebar.css';
+
 export default function Sidebar({ isOpen, setIsOpen }) {
   const location = useLocation();
 
@@ -18,15 +20,15 @@ export default function Sidebar({ isOpen, setIsOpen }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-linear-to-b from-gray-50 to-white border-r border-gray-200 transition-transform duration-300 overflow-y-auto ${
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transition-transform duration-300 overflow-y-auto shadow-sm ${
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
         <div className="flex flex-col h-full">
-          <div className="p-6">
-            {/* Brand Header */}
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-12 h-12 bg-linear-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
+          {/* Brand Header */}
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-linear-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shrink-0 shadow-md">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
@@ -42,9 +44,11 @@ export default function Sidebar({ isOpen, setIsOpen }) {
                 <X className="w-5 h-5" />
               </button>
             </div>
+          </div>
 
-            {/* Navigation */}
-            <nav className="space-y-1">
+          {/* Navigation */}
+          <nav className="flex-1 p-4 overflow-y-auto">
+            <div className="space-y-1">
               {sidebarNav.map(item => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
@@ -53,10 +57,10 @@ export default function Sidebar({ isOpen, setIsOpen }) {
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    className={`group relative w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
                       isActive
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        ? 'bg-blue-50 text-blue-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                   >
                     {/* Active Indicator */}
@@ -78,14 +82,14 @@ export default function Sidebar({ isOpen, setIsOpen }) {
                   </Link>
                 );
               })}
-            </nav>
-          </div>
+            </div>
+          </nav>
 
-          {/* Bottom Section */}
-          <div className="mt-auto p-4 border-t border-gray-200">
-            <div className="bg-linear-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-2xl p-4 border border-blue-100">
+          {/* Bottom Section - Help/Support */}
+          <div className="p-4 border-t border-gray-200">
+            <div className="bg-linear-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
               <div className="flex items-start gap-3 mb-3">
-                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
                   <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
@@ -95,7 +99,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
                   <p className="text-xs text-gray-600 leading-relaxed">Contact our support team</p>
                 </div>
               </div>
-              <button className="w-full bg-white text-blue-700 text-sm font-medium px-4 py-2 rounded-xl hover:bg-blue-50 transition-all border border-blue-200 shadow-sm hover:shadow">
+              <button className="w-full bg-white text-blue-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-50 transition-all border border-blue-200 shadow-sm hover:shadow">
                 Get Support
               </button>
             </div>

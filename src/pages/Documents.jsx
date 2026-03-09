@@ -1,80 +1,54 @@
-import React, { useState } from 'react';
+// src/pages/Documents_Updated.jsx - SAFE VERSION
+import React, { useState, useEffect } from 'react';
 import StatCard from '../components/layout/common/StatCard';
-import { FileText, Clock, CheckCircle, Eye, Check, X, Printer, Download, Filter, Plus, Timer } from 'lucide-react';
+import {
+  FileText,
+  Clock,
+  CheckCircle,
+  Eye,
+  Check,
+  X,
+  Printer,
+  Download,
+  Filter,
+  Plus,
+  Timer,
+  Search,
+  Loader,
+  AlertCircle,
+  XCircle
+} from 'lucide-react';
+import { useDocuments } from '../hooks/useDocuments';
+import { DOCUMENT_TYPES } from '../services/documentsService';
 
-export default function Documents() {
+const Documents = () => {
+  const {
+    documents,
+    loading,
+    error,
+    stats,
+    loadDocuments,
+    search,
+    updateStatus,
+    approve,
+    deny,
+    loadStatistics,
+    clearError
+  } = useDocuments();
+
   const [activeFilter, setActiveFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showDenyModal, setShowDenyModal] = useState(false);
+  const [controlNumber, setControlNumber] = useState('');
+  const [denialReason, setDenialReason] = useState('');
 
-  const requests = [
-    {
-      id: 1,
-      requestId: 'DC-2024-001',
-      resident: {
-        name: 'Juan Dela Cruz',
-        contact: '0917-123-4567'
-      },
-      type: 'Barangay Clearance',
-      date: 'Dec 1, 2024',
-      status: 'Pending'
-    },
-    {
-      id: 2,
-      requestId: 'DC-2024-002',
-      resident: {
-        name: 'Maria Santos',
-        contact: '0928-234-5678'
-      },
-      type: 'Certificate of Residency',
-      date: 'Dec 1, 2024',
-      status: 'Approved'
-    },
-    {
-      id: 3,
-      requestId: 'DC-2024-003',
-      resident: {
-        name: 'Pedro Reyes',
-        contact: '0939-345-6789'
-      },
-      type: 'Certificate of Indigency',
-      date: 'Nov 30, 2024',
-      status: 'Pending'
-    },
-    {
-      id: 4,
-      requestId: 'DC-2024-004',
-      resident: {
-        name: 'Ana Garcia',
-        contact: '0945-456-7890'
-      },
-      type: 'Business Clearance',
-      date: 'Nov 30, 2024',
-      status: 'Approved'
-    },
-    {
-      id: 5,
-      requestId: 'DC-2024-005',
-      resident: {
-        name: 'Roberto Mendoza',
-        contact: '0956-567-8901'
-      },
-      type: 'Good Moral Certificate',
-      date: 'Nov 29, 2024',
-      status: 'Denied'
-    }
-  ];
-
-  const getStatusStyle = (status) => {
-    switch (status) {
-      case 'Pending':
-        return 'bg-orange-100 text-orange-700';
-      case 'Approved':
-        return 'bg-green-100 text-green-700';
-      case 'Denied':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
-    }
-  };
+  // Load data on mount
+  useEffect(() => {
+    loadDocuments();
+    loadStatistics();
+  }, []);
 
   const filterButtons = [
     { id: 'all', label: 'All Requests', icon: FileText },
@@ -83,188 +57,453 @@ export default function Documents() {
     { id: 'denied', label: 'Denied', icon: X }
   ];
 
+  // Handle filter change
+  const handleFilterChange = async (filterId) => {
+    setActiveFilter(filterId);
+    
+    if (filterId === 'all') {
+      await loadDocuments();
+    } else {
+      await loadDocuments({ status: filterId.charAt(0).toUpperCase() + filterId.slice(1) });
+    }
+  };
+
+  // Handle search
+  const handleSearch = async (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+
+    if (value.trim() === '') {
+      await loadDocuments();
+    } else {
+      clearTimeout(window.searchTimeout);
+      window.searchTimeout = setTimeout(async () => {
+        await search(value);
+      }, 500);
+    }
+  };
+
+  // Handle actions
+  const handleView = (doc) => {
+    setSelectedDocument(doc);
+    alert(`Viewing: ${doc.requestId}\nType: ${doc.documentType}\nStatus: ${doc.status}`);
+  };
+
+  const handleApproveClick = (doc) => {
+    setSelectedDocument(doc);
+    setControlNumber(`CTRL-${Date.now()}`);
+    setShowApproveModal(true);
+  };
+
+  const handleApproveConfirm = async () => {
+    if (!controlNumber.trim()) {
+      alert('Please enter a control number');
+      return;
+    }
+
+    const result = await approve(selectedDocument.id, controlNumber, 12);
+    if (result.success) {
+      alert('Document approved successfully!');
+      setShowApproveModal(false);
+      setSelectedDocument(null);
+      setControlNumber('');
+      await loadStatistics();
+    }
+  };
+
+  const handleDenyClick = (doc) => {
+    setSelectedDocument(doc);
+    setShowDenyModal(true);
+  };
+
+  const handleDenyConfirm = async () => {
+    if (!denialReason.trim()) {
+      alert('Please enter a reason for denial');
+      return;
+    }
+
+    const result = await deny(selectedDocument.id, denialReason);
+    if (result.success) {
+      alert('Document request denied');
+      setShowDenyModal(false);
+      setSelectedDocument(null);
+      setDenialReason('');
+      await loadStatistics();
+    }
+  };
+
+  const handlePrint = (doc) => {
+    alert(`🖨 Printing document ${doc.requestId} for ${doc.requester?.name || 'Unknown'}`);
+    // TODO: Implement PDF generation and print
+  };
+
+  const handleDownload = (doc) => {
+    alert(`💾 Downloading document ${doc.requestId} for ${doc.requester?.name || 'Unknown'}`);
+    // TODO: Implement PDF download
+  };
+
+  // Safe data accessors
+  const getRequesterName = (doc) => {
+    return doc.requester?.name || 'N/A';
+  };
+
+  const getRequesterContact = (doc) => {
+    return doc.requester?.contactNumber || 'N/A';
+  };
+
+  const getFormattedDate = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    try {
+      return timestamp.toDate().toLocaleDateString();
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    const statusLower = (status || 'pending').toLowerCase();
+    switch (statusLower) {
+      case 'approved': return 'success';
+      case 'denied': return 'error';
+      case 'processing': return 'warning';
+      default: return 'pending';
+    }
+  };
+
   return (
-    <div className="p-6 bg-gray-50 min-h-full">
+    <div className="page-container">
       {/* Page Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Document Management</h2>
-          <p className="text-gray-600 text-sm mt-1">Process and track document requests</p>
+      <div className="page-header">
+        <div className="page-header-content">
+          <h1 className="page-title">Document Management</h1>
+          <p className="page-subtitle">Process and track document requests</p>
         </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-sm">
-          <Plus className="w-4 h-4" />
+        <button className="btn btn-primary btn-md">
+          <Plus size={18} strokeWidth={2} />
           Issue Document
         </button>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <StatCard
-          title="Pending Requests"
-          value="12"
-          icon={Clock}
-          iconBg="bg-orange-100"
-          iconColor="text-orange-600"
-          badge="Requires action"
-          badgeColor="text-orange-600"
-        />
-        <StatCard
-          title="Approved Today"
-          value="28"
-          icon={CheckCircle}
-          iconBg="bg-green-100"
-          iconColor="text-green-600"
-          badge="12% from yesterday"
-          badgeColor="text-green-600"
-          badgeIcon="↑"
-        />
-        <StatCard
-          title="This Month"
-          value="342"
-          icon={FileText}
-          iconBg="bg-blue-100"
-          iconColor="text-blue-600"
-          badge="Documents issued"
-          badgeColor="text-gray-600"
-        />
-        <StatCard
-          title="Avg. Processing"
-          value="2.4"
-          icon={Timer}
-          iconBg="bg-purple-100"
-          iconColor="text-purple-600"
-          badge="Days per request"
-          badgeColor="text-gray-600"
-        />
-      </div>
-
-      {/* Filters and Table */}
-      <div className="bg-white rounded-xl shadow-sm">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {filterButtons.map(btn => {
-                const Icon = btn.icon;
-                return (
-                  <button
-                    key={btn.id}
-                    onClick={() => setActiveFilter(btn.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                      activeFilter === btn.id
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {btn.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-3">
-              <button className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-2">
-                <Filter className="w-4 h-4" />
-                Filter
-              </button>
-              <button className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-2">
-                <Download className="w-4 h-4" />
-                Export
+      {/* Error Alert */}
+      {error && (
+        <div className="card" style={{ 
+          background: 'var(--color-error-light)', 
+          border: '1px solid var(--color-error)', 
+          marginBottom: 'var(--space-6)' 
+        }}>
+          <div className="card-body">
+            <div className="d-flex align-center justify-between">
+              <div className="d-flex align-center gap-3">
+                <AlertCircle size={24} style={{ color: 'var(--color-error)' }} />
+                <div>
+                  <h4 className="fw-semibold" style={{ color: 'var(--color-error)' }}>Error</h4>
+                  <p className="text-secondary">{error}</p>
+                </div>
+              </div>
+              <button className="btn-icon" onClick={clearError}>
+                <XCircle size={20} />
               </button>
             </div>
           </div>
         </div>
+      )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+      {/* Stats Grid */}
+      <div className="stats-grid">
+        <StatCard
+          title="Pending Requests"
+          value={stats?.pending?.toString() || '0'}
+          icon={Clock}
+          iconBg="icon-bg-warning"
+          badge="Requires action"
+          badgeColor="badge-warning"
+        />
+        <StatCard
+          title="Approved Today"
+          value={stats?.approved?.toString() || '0'}
+          icon={CheckCircle}
+          iconBg="icon-bg-success"
+          badge="This month"
+          badgeColor="badge-success"
+        />
+        <StatCard
+          title="This Month"
+          value={stats?.total?.toString() || '0'}
+          icon={FileText}
+          iconBg="icon-bg-primary"
+          badge="Documents issued"
+          badgeColor="badge-gray"
+        />
+        <StatCard
+          title="Avg. Processing"
+          value={stats?.avgProcessingTime?.toString() || '0'}
+          icon={Timer}
+          iconBg="icon-bg-secondary"
+          badge="Days per request"
+          badgeColor="badge-gray"
+        />
+      </div>
+
+      {/* Filters and Search */}
+      <div className="filters-section">
+        <div className="filter-buttons-group">
+          {filterButtons.map(btn => {
+            const Icon = btn.icon;
+            return (
+              <button
+                key={btn.id}
+                onClick={() => handleFilterChange(btn.id)}
+                disabled={loading}
+                className={`filter-btn ${activeFilter === btn.id ? 'active' : ''}`}
+              >
+                <Icon size={18} strokeWidth={1.5} />
+                {btn.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="action-buttons-group">
+          <div style={{ position: 'relative', minWidth: '250px' }}>
+            <Search
+              size={18}
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--color-text-tertiary)'
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Search documents..."
+              value={searchQuery}
+              onChange={handleSearch}
+              disabled={loading}
+              className="form-input"
+              style={{ paddingLeft: '40px' }}
+            />
+          </div>
+          <button className="btn btn-secondary btn-md" disabled={loading}>
+            <Filter size={18} strokeWidth={1.5} />
+            Filter
+          </button>
+          <button className="btn btn-secondary btn-md" disabled={loading}>
+            <Download size={18} strokeWidth={1.5} />
+            Export
+          </button>
+        </div>
+      </div>
+
+      {/* Data Table */}
+      <div className="data-table-card">
+        <div className="table-container">
+          <table className="data-table">
+            <thead>
               <tr>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Request ID</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Resident</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Document Type</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Date Requested</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Status</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Actions</th>
+                <th>Request ID</th>
+                <th>Resident</th>
+                <th>Document Type</th>
+                <th>Date Requested</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {requests.map((request) => (
-                <tr key={request.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="py-4 px-6 text-sm font-medium text-blue-600">
-                    {request.requestId}
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={`https://ui-avatars.com/api/?name=${request.resident.name}&background=3b82f6&color=fff`}
-                        alt={request.resident.name}
-                        className="w-10 h-10 rounded-full"
-                      />
-                      <div>
-                        <p className="font-medium text-gray-800">{request.resident.name}</p>
-                        <p className="text-sm text-gray-500">{request.resident.contact}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6 text-sm text-gray-600">{request.type}</td>
-                  <td className="py-4 px-6 text-sm text-gray-600">{request.date}</td>
-                  <td className="py-4 px-6">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusStyle(request.status)}`}>
-                      {request.status}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-2">
-                      <button className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      {request.status === 'Pending' ? (
-                        <>
-                          <button className="text-green-600 hover:bg-green-50 p-2 rounded-lg transition-colors">
-                            <Check className="w-4 h-4" />
-                          </button>
-                          <button className="text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      ) : request.status === 'Approved' ? (
-                        <>
-                          <button className="text-purple-600 hover:bg-purple-50 p-2 rounded-lg transition-colors">
-                            <Printer className="w-4 h-4" />
-                          </button>
-                          <button className="text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors">
-                            <Download className="w-4 h-4" />
-                          </button>
-                        </>
-                      ) : (
-                        <button className="text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors">
-                          <FileText className="w-4 h-4" />
-                        </button>
-                      )}
+            <tbody>
+              {loading && documents.length === 0 ? (
+                <tr>
+                  <td colSpan="6">
+                    <div className="empty-state">
+                      <Loader className="empty-state-icon animate-spin" />
+                      <h3 className="empty-state-title">Loading documents...</h3>
+                      <p className="empty-state-description">Please wait</p>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : documents.length > 0 ? (
+                documents.map((doc) => (
+                  <tr key={doc.id}>
+                    <td>
+                      <span className="fw-semibold text-primary">
+                        {doc.requestId}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="user-info-cell">
+                        <div className="user-details">
+                          <span className="user-name">{getRequesterName(doc)}</span>
+                          <span className="user-meta">{getRequesterContact(doc)}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="text-secondary">{doc.documentType || 'N/A'}</td>
+                    <td className="text-secondary">
+                      {getFormattedDate(doc.systemInfo?.requestDate)}
+                    </td>
+                    <td>
+                      <span className={`status-badge status-${getStatusColor(doc.status)}`}>
+                        {doc.status || 'Pending'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="d-flex align-center gap-2">
+                        <button
+                          className="btn-icon btn-icon-sm"
+                          onClick={() => handleView(doc)}
+                          title="View Details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        
+                        {doc.status === 'Pending' && (
+                          <>
+                            <button
+                              className="btn-icon btn-icon-sm"
+                              onClick={() => handleApproveClick(doc)}
+                              title="Approve"
+                              style={{ color: 'var(--color-success)' }}
+                            >
+                              <Check size={16} />
+                            </button>
+                            <button
+                              className="btn-icon btn-icon-sm"
+                              onClick={() => handleDenyClick(doc)}
+                              title="Deny"
+                              style={{ color: 'var(--color-error)' }}
+                            >
+                              <X size={16} />
+                            </button>
+                          </>
+                        )}
+                        
+                        {doc.status === 'Approved' && (
+                          <>
+                            <button
+                              className="btn-icon btn-icon-sm"
+                              onClick={() => handlePrint(doc)}
+                              title="Print"
+                              style={{ color: 'var(--color-secondary)' }}
+                            >
+                              <Printer size={16} />
+                            </button>
+                            <button
+                              className="btn-icon btn-icon-sm"
+                              onClick={() => handleDownload(doc)}
+                              title="Download"
+                              style={{ color: 'var(--color-primary)' }}
+                            >
+                              <Download size={16} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6">
+                    <div className="empty-state">
+                      <FileText className="empty-state-icon" />
+                      <h3 className="empty-state-title">No documents found</h3>
+                      <p className="empty-state-description">
+                        {searchQuery ? 'Try adjusting your search criteria' : 'No document requests yet'}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-          <p className="text-sm text-gray-600">Showing 1 to 5 of 342 requests</p>
-          <div className="flex items-center gap-2">
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              Previous
-            </button>
-            <button className="px-3 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg">1</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">2</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">3</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">...</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              Next
-            </button>
+        {documents.length > 0 && (
+          <div className="pagination-container">
+            <p className="pagination-info">
+              Showing {documents.length} request{documents.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Approve Modal */}
+      {showApproveModal && (
+        <div className="modal-overlay" onClick={() => setShowApproveModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Approve Document</h3>
+              <button className="btn-icon" onClick={() => setShowApproveModal(false)}>
+                <XCircle size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="text-secondary mb-4">
+                Approving: <strong>{selectedDocument?.requestId}</strong>
+              </p>
+              <div className="form-group">
+                <label className="form-label">Control Number</label>
+                <input
+                  type="text"
+                  value={controlNumber}
+                  onChange={(e) => setControlNumber(e.target.value)}
+                  className="form-input"
+                  placeholder="CTRL-XXXX"
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowApproveModal(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-success" onClick={handleApproveConfirm} disabled={loading}>
+                {loading ? <Loader size={16} className="animate-spin" /> : <Check size={16} />}
+                Approve Document
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Deny Modal */}
+      {showDenyModal && (
+        <div className="modal-overlay" onClick={() => setShowDenyModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Deny Document Request</h3>
+              <button className="btn-icon" onClick={() => setShowDenyModal(false)}>
+                <XCircle size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="text-secondary mb-4">
+                Denying: <strong>{selectedDocument?.requestId}</strong>
+              </p>
+              <div className="form-group">
+                <label className="form-label">Reason for Denial</label>
+                <textarea
+                  value={denialReason}
+                  onChange={(e) => setDenialReason(e.target.value)}
+                  className="form-input"
+                  rows="4"
+                  placeholder="Enter reason..."
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowDenyModal(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-error" onClick={handleDenyConfirm} disabled={loading}>
+                {loading ? <Loader size={16} className="animate-spin" /> : <X size={16} />}
+                Deny Request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default Documents;

@@ -1,0 +1,268 @@
+/* Health Services Page - Simple, Clean & Professional */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f8fafc;
+}
+
+.health-services-page {
+  padding: 1.5rem;
+  background: #f8fafc;
+  min-width: 100vh;
+}
+
+/* Page Header */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.page-subtitle {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+}
+
+/* Buttons */
+button {
+  border: none;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #3b82f6;
+  color: white;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover {
+  background: #2563eb;
+}
+
+.btn-view {
+  background: #3b82f6;
+  color: white;
+  padding: 0.375rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.btn-view:hover {
+  background: #2563eb;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Cards */
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Card Header */
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.card-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* Appointments Table */
+.appointments-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.appointments-table thead th {
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.875rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.appointments-table tbody tr {
+  transition: background 0.2s;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.appointments-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.appointments-table tbody td {
+  padding: 1rem;
+  font-size: 0.875rem;
+}
+
+/* Status Badge */
+.badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Side Column */
+.side-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* View All Link */
+.view-all-link {
+  color: #3b82f6;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.view-all-link:hover {
+  color: #2563eb;
+}
+
+/* Patient List */
+.patient-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.patient-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.patient-item:hover {
+  background: #f8fafc;
+}
+
+.patient-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: white;
+}
+
+.patient-info {
+  flex: 1;
+}
+
+.patient-name {
+  font-weight: 500;
+  color: #1e293b;
+  font-size: 0.875rem;
+  margin-bottom: 0.125rem;
+}
+
+.patient-details {
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+/* Color Utilities */
+.bg-blue-100 { background: #dbeafe; }
+.bg-pink-100 { background: #fce7f3; }
+.bg-green-100 { background: #d1fae5; }
+.bg-orange-100 { background: #fed7aa; }
+.bg-yellow-100 { background: #fef3c7; }
+
+.text-blue-600 { color: #2563eb; }
+.text-pink-600 { color: #db2777; }
+.text-green-600 { color: #059669; }
+.text-green-700 { color: #047857; }
+.text-yellow-700 { color: #ca8a04; }
+.text-orange-600 { color: #ea580c; }
+.text-gray-600 { color: #64748b; }
+.text-gray-800 { color: #1e293b; }
+
+.bg-blue-500 { background: #3b82f6; }
+.bg-pink-500 { background: #ec4899; }
+.bg-green-500 { background: #10b981; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .health-services-page {
+    padding: 1rem;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .appointments-table {
+    font-size: 0.8125rem;
+  }
+
+  .appointments-table thead th,
+  .appointments-table tbody td {
+    padding: 0.75rem 0.5rem;
+  }
+}

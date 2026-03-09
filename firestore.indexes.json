@@ -1,0 +1,61 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "residents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "personalInfo.lastName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "personalInfo.firstName",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "residents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "systemInfo.status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "statusFlags.isSeniorCitizen",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "residents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "systemInfo.status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "statusFlags.isPWD",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "residents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "systemInfo.status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "statusFlags.isVoter",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

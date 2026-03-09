@@ -1,240 +1,331 @@
 import React, { useState } from 'react';
 import StatCard from '../components/layout/common/StatCard';
-import { Megaphone, Eye, AlertCircle, Clock, List, Info, Newspaper, Filter, Download, Plus, Edit, Trash2, Users, MapPin, User } from 'lucide-react';
+import {
+  Megaphone,
+  AlertCircle,
+  CheckCircle,
+  Eye,
+  List,
+  Filter,
+  Plus,
+  Edit,
+  Trash2,
+  User,
+  Clock,
+  Search,
+  Bell,
+  TrendingUp,
+  Users
+} from 'lucide-react';
 
-export default function Announcements() {
+
+const Announcements = () => {
   const [activeFilter, setActiveFilter] = useState('all');
-
-  const announcements = [
+  const [searchQuery, setSearchQuery] = useState('');
+  const [announcements, setAnnouncements] = useState([
     {
       id: 1,
-      type: 'urgent',
-      title: 'Typhoon Signal #2 - Preparation Advisory',
-      content: 'All residents are advised to secure loose items, stock emergency supplies, and stay updated. Evacuation centers are on standby. Monitor official channels for updates.',
-      postedBy: 'Admin User',
-      postedTime: '2 hours ago',
-      views: 342,
-      audience: 'All Residents',
-      icon: AlertCircle,
-      iconBg: 'bg-red-100',
-      iconColor: 'text-red-600',
-      badgeColor: 'bg-red-100 text-red-700',
-      borderColor: 'border-red-500'
+      type: 'URGENT',
+      typeClass: 'urgent',
+      title: 'Emergency Community Meeting',
+      description: 'All residents are required to attend an emergency meeting regarding the upcoming road construction project. This will affect main access routes and requires community coordination.',
+      time: '2 hours ago',
+      author: 'Admin User',
+      views: 234,
+      icon: AlertCircle
     },
     {
       id: 2,
-      type: 'important',
-      title: 'Vaccination Schedule - December 2024',
-      content: "Free vaccination program for children 0-5 years old. Schedule: Dec 5-7, 8AM-4PM at the Barangay Health Center. Bring child's immunization card.",
-      postedBy: 'Health Officer',
-      postedTime: '1 day ago',
-      views: 523,
-      audience: 'Parents & Guardians',
-      icon: AlertCircle,
-      iconBg: 'bg-orange-100',
-      iconColor: 'text-orange-600',
-      badgeColor: 'bg-orange-100 text-orange-700',
-      borderColor: 'border-orange-500'
+      type: 'IMPORTANT',
+      typeClass: 'important',
+      title: 'Health Services Schedule Update',
+      description: 'The barangay health center will have modified operating hours next week due to the medical mission. Free health checkups and consultations will be available from 8 AM to 5 PM.',
+      time: '5 hours ago',
+      author: 'Health Officer',
+      views: 189,
+      icon: Megaphone
     },
     {
       id: 3,
-      type: 'general',
-      title: 'New Garbage Collection Schedule',
-      content: 'Starting December 5, garbage collection schedule updated: Biodegradable (Mon/Thu), Non-biodegradable (Tue/Fri), Recyclables (Wed). Segregate properly.',
-      postedBy: 'Sanitation Head',
-      postedTime: '2 days ago',
-      views: 1128,
-      audience: 'All Residents',
-      icon: Info,
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600',
-      badgeColor: 'bg-blue-100 text-blue-700',
-      borderColor: 'border-blue-500'
+      type: 'GENERAL',
+      typeClass: 'general',
+      title: 'Community Garden Registration Open',
+      description: 'We are now accepting applications for community garden plots. This is a great opportunity to grow your own vegetables and connect with neighbors. Limited slots available.',
+      time: '1 day ago',
+      author: 'Agricultural Officer',
+      views: 156,
+      icon: Bell
     },
     {
       id: 4,
-      type: 'general',
-      title: 'Senior Citizens Christmas Bonus Distribution',
-      content: 'Distribution of senior citizens Christmas bonus on December 10-12. Bring valid ID and senior citizen ID. Venue: Barangay Hall. Time: 9AM-3PM.',
-      postedBy: 'Admin User',
-      postedTime: '3 days ago',
-      views: 856,
-      audience: 'Senior Citizens',
-      icon: Info,
-      iconBg: 'bg-green-100',
-      iconColor: 'text-green-600',
-      badgeColor: 'bg-green-100 text-green-700',
-      borderColor: 'border-green-500'
+      type: 'INFO',
+      typeClass: 'info',
+      title: 'Garbage Collection Schedule',
+      description: 'Please be reminded that garbage collection for biodegradable waste is every Monday and Thursday, while non-biodegradable waste is collected every Wednesday and Saturday.',
+      time: '2 days ago',
+      author: 'Sanitation Officer',
+      views: 98,
+      icon: Megaphone
     }
-  ];
+  ]);
 
   const filterButtons = [
-    { id: 'all', label: 'All', icon: List },
+    { id: 'all', label: 'All Announcements', icon: List },
     { id: 'urgent', label: 'Urgent', icon: AlertCircle },
-    { id: 'important', label: 'Important', icon: Info },
-    { id: 'general', label: 'General', icon: Newspaper }
+    { id: 'important', label: 'Important', icon: Megaphone },
+    { id: 'general', label: 'General', icon: Bell }
   ];
 
+  // Handle actions
+  const handleView = (announcement) => {
+    alert(`Viewing: ${announcement.title}\n\nType: ${announcement.type}\nAuthor: ${announcement.author}\nViews: ${announcement.views}`);
+  };
+
+  const handleEdit = (announcement) => {
+    alert(`Edit announcement: ${announcement.title}`);
+  };
+
+  const handleDelete = (announcement) => {
+    if (window.confirm(`Delete announcement "${announcement.title}"?`)) {
+      setAnnouncements(prev => prev.filter(a => a.id !== announcement.id));
+      alert('Announcement deleted successfully!');
+    }
+  };
+
+  const handleCreateAnnouncement = () => {
+    alert('Create new announcement - Form would open here');
+  };
+
+  // Filter announcements
+  const filteredAnnouncements = announcements.filter(announcement => {
+    const matchesSearch = 
+      announcement.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      announcement.description.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesFilter = 
+      activeFilter === 'all' || 
+      announcement.typeClass === activeFilter;
+    
+    return matchesSearch && matchesFilter;
+  });
+
+  // Get type color
+  const getTypeColor = (typeClass) => {
+    switch(typeClass) {
+      case 'urgent': return 'error';
+      case 'important': return 'warning';
+      case 'general': return 'primary';
+      case 'info': return 'success';
+      default: return 'primary';
+    }
+  };
+
   return (
-    <div className="p-6 bg-gray-50 min-h-full">
+    <div className="page-container">
       {/* Page Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Announcements & Communication</h2>
-          <p className="text-gray-600 text-sm mt-1">Manage public announcements and community updates</p>
+      <div className="page-header">
+        <div className="page-header-content">
+          <h1 className="page-title">Announcements</h1>
+          <p className="page-subtitle">Manage barangay announcements and notices</p>
         </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-sm">
-          <Plus className="w-4 h-4" />
-          New Announcement
+        <button className="btn btn-primary btn-md" onClick={handleCreateAnnouncement}>
+          <Plus size={18} strokeWidth={2} />
+          Create Announcement
         </button>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="stats-grid">
+        <StatCard
+          title="Total Posts"
+          value="156"
+          icon={Megaphone}
+          iconBg="icon-bg-primary"
+          badge="This month"
+          badgeColor="badge-primary"
+        />
+        <StatCard
+          title="Total Views"
+          value="12.4K"
+          icon={Eye}
+          iconBg="icon-bg-success"
+          badge="↑ 12.5%"
+          badgeColor="badge-success"
+        />
         <StatCard
           title="Active"
-          value="18"
-          icon={Megaphone}
-          iconBg="bg-blue-100"
-          iconColor="text-blue-600"
-          badge="Published"
-          badgeColor="text-blue-600"
+          value="23"
+          icon={CheckCircle}
+          iconBg="icon-bg-warning"
+          badge="Currently"
+          badgeColor="badge-gray"
         />
         <StatCard
-          title="This Week"
-          value="1,247"
-          icon={Eye}
-          iconBg="bg-green-100"
-          iconColor="text-green-600"
-          badge="Views"
-          badgeColor="text-green-600"
-          badgeIcon="↑"
-        />
-        <StatCard
-          title="Urgent"
-          value="3"
-          icon={AlertCircle}
-          iconBg="bg-red-100"
-          iconColor="text-red-600"
-          badge="Priority alerts"
-          badgeColor="text-red-600"
-        />
-        <StatCard
-          title="Scheduled"
-          value="5"
-          icon={Clock}
-          iconBg="bg-purple-100"
-          iconColor="text-purple-600"
-          badge="Future posts"
-          badgeColor="text-gray-600"
+          title="Avg. Engagement"
+          value="89%"
+          icon={TrendingUp}
+          iconBg="icon-bg-secondary"
+          badge="Read rate"
+          badgeColor="badge-gray"
         />
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {filterButtons.map(btn => {
-              const Icon = btn.icon;
-              return (
-                <button
-                  key={btn.id}
-                  onClick={() => setActiveFilter(btn.id)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                    activeFilter === btn.id
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {btn.label}
-                </button>
-              );
-            })}
+      <div className="filters-section">
+        <div className="filter-buttons-group">
+          {filterButtons.map(btn => {
+            const Icon = btn.icon;
+            return (
+              <button
+                key={btn.id}
+                onClick={() => setActiveFilter(btn.id)}
+                className={`filter-btn ${activeFilter === btn.id ? 'active' : ''}`}
+              >
+                <Icon size={18} strokeWidth={1.5} />
+                {btn.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="action-buttons-group">
+          <div style={{ position: 'relative', minWidth: '250px' }}>
+            <Search 
+              size={18} 
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--color-text-tertiary)'
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Search announcements..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="form-input"
+              style={{ paddingLeft: '40px' }}
+            />
           </div>
-          <div className="flex items-center gap-3">
-            <button className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              Filter
-            </button>
-            <button className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-2">
-              <Download className="w-4 h-4" />
-              Export
-            </button>
-          </div>
+          <button className="btn btn-secondary btn-md">
+            <Filter size={18} strokeWidth={1.5} />
+            Filter
+          </button>
         </div>
       </div>
 
       {/* Announcements List */}
-      <div className="space-y-4">
-        {announcements.map(announcement => {
-          const Icon = announcement.icon;
-          return (
-            <div
-              key={announcement.id}
-              className={`bg-white rounded-xl p-6 shadow-sm transition-all hover:shadow-md hover:translate-x-1 border-l-4 ${announcement.borderColor}`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4 flex-1">
-                  <div className={`w-12 h-12 ${announcement.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
-                    <Icon className={`w-6 h-6 ${announcement.iconColor}`} />
+      <div className="list-container">
+        {filteredAnnouncements.length > 0 ? (
+          filteredAnnouncements.map(announcement => {
+            const Icon = announcement.icon;
+            const typeColor = getTypeColor(announcement.typeClass);
+            
+            return (
+              <div
+                key={announcement.id}
+                className={`list-card list-card-${typeColor}`}
+              >
+                <div className="list-card-content">
+                  {/* Icon */}
+                  <div
+                    style={{
+                      width: '56px',
+                      height: '56px',
+                      background: `var(--color-${typeColor}-light)`,
+                      borderRadius: 'var(--radius-xl)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      color: `var(--color-${typeColor})`
+                    }}
+                  >
+                    <Icon size={28} strokeWidth={2} />
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${announcement.badgeColor}`}>
-                        {announcement.type.toUpperCase()}
+                  
+                  <div className="list-card-body">
+                    <div className="list-card-header">
+                      <span className={`badge badge-${typeColor}`}>
+                        {announcement.type}
                       </span>
-                      <span className="text-xs text-gray-500">Posted {announcement.postedTime}</span>
+                      <span className="list-card-meta-item">
+                        <Clock size={14} />
+                        {announcement.time}
+                      </span>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-800 mb-2">{announcement.title}</h3>
-                    <p className="text-gray-600 text-sm mb-3">{announcement.content}</p>
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Eye className="w-4 h-4" />
+                    
+                    <h3 className="list-card-title">{announcement.title}</h3>
+                    <p className="list-card-description">{announcement.description}</p>
+                    
+                    <div className="list-card-meta">
+                      <span className="list-card-meta-item">
+                        <User size={14} />
+                        {announcement.author}
+                      </span>
+                      <span className="list-card-meta-item">
+                        <Eye size={14} />
                         {announcement.views} views
                       </span>
-                      <span className="flex items-center gap-1">
-                        <Users className="w-4 h-4" />
-                        {announcement.audience}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <User className="w-4 h-4" />
-                        {announcement.postedBy}
-                      </span>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors">
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button className="text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  
+                  <div className="list-card-actions">
+                    <button 
+                      className="btn-icon"
+                      onClick={() => handleView(announcement)}
+                      title="View Details"
+                    >
+                      <Eye size={18} />
+                    </button>
+                    <button 
+                      className="btn-icon"
+                      onClick={() => handleEdit(announcement)}
+                      title="Edit"
+                    >
+                      <Edit size={18} />
+                    </button>
+                    <button 
+                      className="btn-icon"
+                      onClick={() => handleDelete(announcement)}
+                      title="Delete"
+                      style={{ color: 'var(--color-error)' }}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        ) : (
+          <div className="empty-state">
+            <Megaphone className="empty-state-icon" />
+            <h3 className="empty-state-title">No announcements found</h3>
+            <p className="empty-state-description">
+              Try adjusting your search criteria or create a new announcement
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Pagination */}
-      <div className="bg-white rounded-xl shadow-sm p-6 mt-6">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-600">Showing 1 to 4 of 18 announcements</p>
-          <div className="flex items-center gap-2">
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              Previous
-            </button>
-            <button className="px-3 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg">1</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">2</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">3</button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              Next
-            </button>
+      {filteredAnnouncements.length > 0 && (
+        <div className="card">
+          <div className="pagination-container">
+            <p className="pagination-info">Showing 1 to 4 of 4 announcements</p>
+            <div className="pagination">
+              <button className="pagination-btn" disabled>Previous</button>
+              <button className="pagination-btn active">1</button>
+              <button className="pagination-btn">2</button>
+              <button className="pagination-btn">Next</button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
-}
+};
+
+export default Announcements;
