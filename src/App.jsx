@@ -6,10 +6,10 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 //Styles
 import './styles/Layout.css';
-import './styles/TailwindEnhancement.css';
+import './styles/Tailwindenhancement.css';
 import './styles/Animations.css';
-import './styles/GlobalStyles.css';
-import './styles/PageStyles.css';
+import './styles/Globalstyles.css';
+import './styles/Pagestyles.css';
 
 // Auth Pages
 import Login from './pages/auth/Login';
@@ -35,154 +35,41 @@ import TestFirebase from './pages/TestFirebase';
 // Layout Component
 import Layout from './components/layout/Layout';
 
+const Protected = ({ children }) => (
+  <ProtectedRoute>
+    <Layout>{children}</Layout>
+  </ProtectedRoute>
+);
+
 function App() {
   return (
     <Router>
       <AuthProvider>
         <Routes>
-          {/* Public Routes - No login required */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+          {/* Public Routes */}
+          <Route path="/login"         element={<Login />} />
+          <Route path="/signup"        element={<Signup />} />
           <Route path="/test-firebase" element={<TestFirebase />} />
 
-          {/* Protected Routes - Login required */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Dashboard />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/residents"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Residents />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/documents"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Documents />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/incidents"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Incidents />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/announcements"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Announcements />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/events"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Events />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/health"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <HealthServices />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/welfare"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <SocialWelfare />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/waste"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <WasteManagement />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/finance"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Finance />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/drrm"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <DRRM />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Settings />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
+          {/* Protected Routes */}
+          <Route path="/dashboard"     element={<Protected><Dashboard /></Protected>} />
+          <Route path="/residents"     element={<Protected><Residents /></Protected>} />
+          <Route path="/documents"     element={<Protected><Documents /></Protected>} />
+          <Route path="/incidents"     element={<Protected><Incidents /></Protected>} />
+          <Route path="/announcements" element={<Protected><Announcements /></Protected>} />
+          <Route path="/events"        element={<Protected><Events /></Protected>} />
+          <Route path="/drrm"          element={<Protected><DRRM /></Protected>} />
+          <Route path="/finance"       element={<Protected><Finance /></Protected>} />
+          <Route path="/settings"      element={<Protected><Settings /></Protected>} />
 
-          {/* Default Route - Redirect to login */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          
-          {/* 404 Not Found */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* ✅ FIXED — must match sidebarNav.js exactly */}
+          <Route path="/health-services"  element={<Protected><HealthServices /></Protected>} />
+          <Route path="/social-welfare"   element={<Protected><SocialWelfare /></Protected>} />
+          <Route path="/waste-management" element={<Protected><WasteManagement /></Protected>} />
+
+          {/* Default */}
+          <Route path="/"  element={<Navigate to="/login" replace />} />
+          <Route path="*"  element={<Navigate to="/login" replace />} />
         </Routes>
       </AuthProvider>
     </Router>

@@ -1,780 +1,652 @@
 // src/pages/HealthServices.jsx
 import React, { useState, useEffect } from 'react';
 import StatCard from '../components/layout/common/StatCard';
-import { 
-  Users, 
-  Calendar, 
-  Syringe, 
-  Clipboard, 
-  Plus, 
-  Eye,
-  Check,
-  X,
-  Edit,
-  Loader,
-  AlertCircle,
-  XCircle,
-  Search,
-  Filter
-} from 'lucide-react';
 import { useHealth } from '../hooks/useHealth';
+import {
+  Users, Calendar, Syringe, Clipboard, Plus, Eye, Check,
+  X, Edit, Trash2, Save, Search, AlertCircle, Package,
+  Activity, Sparkles, Loader, FileText, Copy, CheckCheck,
+} from 'lucide-react';
 
-const HealthServices = () => {
+const APPT_TYPES    = ['consultation','prenatal','immunization','dental','general'];
+const APPT_STATUSES = ['Scheduled','Completed','Cancelled','No Show'];
+const VACCINES      = ['BCG','Hepatitis B','DPT','OPV','MMR','Varicella','Flu','COVID-19','Other'];
+const DISEASES      = ['Dengue','Influenza','Diarrhea','Typhoid','Tuberculosis','Measles','Chickenpox','COVID-19','Other'];
+const MED_CATS      = ['Antibiotic','Analgesic','Antihypertensive','Vitamins','Antacid','Antiseptic','General'];
+
+const emptyAppt    = { patientName: '', residentId: '', appointmentDate: '', appointmentTime: '09:00', appointmentType: 'consultation', notes: '' };
+const emptyImm     = { patientName: '', residentId: '', vaccineName: '', doseNumber: 1, nextDoseDate: '', remarks: '' };
+const emptyDisease = { disease: 'Dengue', patientName: '', purok: '', age: '', gender: '', dateOnset: '', status: 'Active', notes: '' };
+const emptyMed     = { name: '', category: 'General', unit: 'pcs', quantity: '', lowStockAt: 10, expiryDate: '', supplier: '', notes: '' };
+
+// ── AI Health Report helper ───────────────────────────────────
+const generateHealthReport = async ({ diseases, appointments, immunizations, medicines, stats }) => {
+  // Summarise data for the prompt
+  const diseaseSummary = diseases.reduce((acc, d) => {
+    acc[d.disease] = (acc[d.disease] || 0) + 1;
+    return acc;
+  }, {});
+
+  const activeCases   = diseases.filter(d => d.status === 'Active').length;
+  const recovered     = diseases.filter(d => d.status === 'Recovered').length;
+  const scheduled     = appointments.filter(a => a.status === 'Scheduled').length;
+  const lowStock      = medicines.filter(m => (m.quantity || 0) <= (m.lowStockAt || 10)).map(m => m.name);
+  const purokHotspots = diseases.reduce((acc, d) => {
+    if (d.purok) acc[d.purok] = (acc[d.purok] || 0) + 1;
+    return acc;
+  }, {});
+
+  const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 1200,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a health officer writing official barangay health situation reports in the Philippines. Write clearly, professionally, and concisely. Use plain English.',
+        },
+        {
+          role: 'user',
+          content: `Write a Barangay Health Situation Report based on this data. Use proper report format with sections.
+
+Date: ${today}
+Total disease cases recorded: ${diseases.length}
+Active cases: ${activeCases}
+Recovered: ${recovered}
+Disease breakdown: ${JSON.stringify(diseaseSummary)}
+Purok hotspots: ${JSON.stringify(purokHotspots)}
+Scheduled appointments: ${scheduled}
+Total immunization records: ${immunizations.length}
+Low stock medicines: ${lowStock.length > 0 ? lowStock.join(', ') : 'None'}
+
+Write a report with these sections:
+1. SITUATION OVERVIEW — 2-3 sentences on the current health status
+2. DISEASE SURVEILLANCE — breakdown of cases, which diseases are most common, which puroks are affected
+3. HEALTH SERVICES — appointments and immunization status
+4. PHARMACY STATUS — medicine supply situation  
+5. RECOMMENDATIONS — 3 specific action items for the barangay health team
+
+Keep each section concise. Use bullet points where appropriate. Do not use markdown headers with #, use plain text headers in ALL CAPS instead.`,
+        },
+      ],
+    }),
+  });
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || 'Failed to generate report.';
+};
+
+// ── Main Component ────────────────────────────────────────────
+export default function HealthServices() {
   const {
-    patients,
-    appointments,
-    immunizations,
-    loading,
-    error,
-    stats,
-    loadPatients,
-    loadAppointments,
-    createAppointment,
-    updateAppointment,
-    loadImmunizations,
-    createImmunization,
-    loadStatistics,
-    clearError
+    patients, appointments, immunizations, diseases, medicines,
+    loading, error, stats,
+    loadAll, loadAppointments, loadImmunizations, loadDiseases, loadMedicines,
+    createAppointment, updateAppointment, removeAppointment,
+    createImmunization, removeImmunization,
+    reportDisease, updateDisease, removeDisease,
+    createMedicine, editMedicine, dispense, removeMedicine,
+    loadStatistics, clearError,
   } = useHealth();
 
   const [activeTab, setActiveTab] = useState('appointments');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
-  const [showImmunizationModal, setShowImmunizationModal] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [search,    setSearch]    = useState('');
 
-  // Appointment form data
-  const [appointmentForm, setAppointmentForm] = useState({
-    patientName: '',
-    residentId: '',
-    appointmentDate: '',
-    appointmentTime: '09:00',
-    appointmentType: 'consultation',
-    notes: ''
-  });
+  // Appointment
+  const [showApptModal, setShowApptModal] = useState(false);
+  const [apptForm,      setApptForm]      = useState(emptyAppt);
+  // Immunization
+  const [showImmModal, setShowImmModal] = useState(false);
+  const [immForm,      setImmForm]      = useState(emptyImm);
+  // Disease
+  const [showDiseaseModal, setShowDiseaseModal] = useState(false);
+  const [editingDisease,   setEditingDisease]   = useState(null);
+  const [diseaseForm,      setDiseaseForm]      = useState(emptyDisease);
+  // Medicine
+  const [showMedModal, setShowMedModal] = useState(false);
+  const [editingMed,   setEditingMed]   = useState(null);
+  const [medForm,      setMedForm]      = useState(emptyMed);
+  const [showDispense, setShowDispense] = useState(false);
+  const [dispenseId,   setDispenseId]   = useState(null);
+  const [dispenseQty,  setDispenseQty]  = useState(1);
 
-  // Immunization form data
-  const [immunizationForm, setImmunizationForm] = useState({
-    patientName: '',
-    residentId: '',
-    vaccineName: '',
-    doseNumber: 1,
-    nextDoseDate: '',
-    remarks: ''
-  });
+  const [saving,  setSaving]  = useState(false);
+  const [formErr, setFormErr] = useState('');
 
-  // Load data on mount
-  useEffect(() => {
-    loadAppointments();
-    loadPatients();
-    loadImmunizations();
-    loadStatistics();
-  }, []);
+  // ── AI Report state ──
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportLoading,   setReportLoading]   = useState(false);
+  const [reportText,      setReportText]      = useState('');
+  const [reportError,     setReportError]     = useState('');
+  const [copied,          setCopied]          = useState(false);
 
-  // Handle appointment form change
-  const handleAppointmentChange = (e) => {
-    const { name, value } = e.target;
-    setAppointmentForm(prev => ({ ...prev, [name]: value }));
+  useEffect(() => { loadAll(); }, []);
+
+  const fmtDate = (ts) => {
+    if (!ts) return 'N/A';
+    try { return ts.toDate ? ts.toDate().toLocaleDateString() : new Date(ts).toLocaleDateString(); }
+    catch { return 'N/A'; }
   };
 
-  // Handle immunization form change
-  const handleImmunizationChange = (e) => {
-    const { name, value } = e.target;
-    setImmunizationForm(prev => ({ ...prev, [name]: value }));
-  };
-
-  // Submit appointment
-  const handleAppointmentSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!appointmentForm.patientName || !appointmentForm.appointmentDate) {
-      alert('Please fill in all required fields');
-      return;
-    }
-
-    const result = await createAppointment(appointmentForm);
-    
-    if (result.success) {
-      alert('Appointment booked successfully!');
-      setShowAppointmentModal(false);
-      setAppointmentForm({
-        patientName: '',
-        residentId: '',
-        appointmentDate: '',
-        appointmentTime: '09:00',
-        appointmentType: 'consultation',
-        notes: ''
-      });
-      loadStatistics();
-    } else {
-      alert('Error: ' + result.error);
-    }
-  };
-
-  // Submit immunization
-  const handleImmunizationSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!immunizationForm.patientName || !immunizationForm.vaccineName) {
-      alert('Please fill in all required fields');
-      return;
-    }
-
-    const result = await createImmunization(immunizationForm);
-    
-    if (result.success) {
-      alert('Immunization record added successfully!');
-      setShowImmunizationModal(false);
-      setImmunizationForm({
-        patientName: '',
-        residentId: '',
-        vaccineName: '',
-        doseNumber: 1,
-        nextDoseDate: '',
-        remarks: ''
-      });
-      loadStatistics();
-    } else {
-      alert('Error: ' + result.error);
-    }
-  };
-
-  // Update appointment status
-  const handleStatusUpdate = async (appointmentId, newStatus) => {
-    const result = await updateAppointment(appointmentId, newStatus);
-    
-    if (result.success) {
-      alert(`Appointment ${newStatus.toLowerCase()}!`);
-      loadStatistics();
-    } else {
-      alert('Error: ' + result.error);
-    }
-  };
-
-  // Filter appointments
-  const filteredAppointments = appointments.filter(apt => {
-    if (!searchQuery) return true;
-    const searchLower = searchQuery.toLowerCase();
-    return apt.patientName?.toLowerCase().includes(searchLower);
-  });
-
-  // Filter immunizations
-  const filteredImmunizations = immunizations.filter(imm => {
-    if (!searchQuery) return true;
-    const searchLower = searchQuery.toLowerCase();
-    return imm.patientName?.toLowerCase().includes(searchLower) ||
-           imm.vaccineName?.toLowerCase().includes(searchLower);
-  });
-
-  // Format date
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A';
+  // ── AI Report ──
+  const handleGenerateReport = async () => {
+    setShowReportModal(true);
+    setReportLoading(true);
+    setReportText('');
+    setReportError('');
+    setCopied(false);
     try {
-      return timestamp.toDate().toLocaleDateString();
-    } catch {
-      return 'N/A';
+      const report = await generateHealthReport({ diseases, appointments, immunizations, medicines, stats });
+      setReportText(report);
+    } catch (e) {
+      setReportError('Failed to generate report. Please try again.');
+      console.error('AI report error:', e);
+    } finally {
+      setReportLoading(false);
     }
   };
+
+  const handleCopyReport = () => {
+    navigator.clipboard.writeText(reportText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // ── Appointment handlers ──
+  const handleApptSave = async () => {
+    if (!apptForm.patientName || !apptForm.appointmentDate) { setFormErr('Patient name and date required.'); return; }
+    setSaving(true);
+    const r = await createAppointment(apptForm);
+    setSaving(false);
+    if (r.success) { setShowApptModal(false); setApptForm(emptyAppt); loadStatistics(); }
+    else setFormErr(r.error);
+  };
+
+  // ── Immunization handlers ──
+  const handleImmSave = async () => {
+    if (!immForm.patientName || !immForm.vaccineName) { setFormErr('Patient and vaccine required.'); return; }
+    setSaving(true);
+    const r = await createImmunization(immForm);
+    setSaving(false);
+    if (r.success) { setShowImmModal(false); setImmForm(emptyImm); loadStatistics(); }
+    else setFormErr(r.error);
+  };
+
+  // ── Disease handlers ──
+  const openAddDisease  = () => { setDiseaseForm(emptyDisease); setEditingDisease(null); setFormErr(''); setShowDiseaseModal(true); };
+  const openEditDisease = (d) => { setDiseaseForm({ disease: d.disease, patientName: d.patientName, purok: d.purok, age: d.age, gender: d.gender, dateOnset: d.dateOnset, status: d.status, notes: d.notes || '' }); setEditingDisease(d); setFormErr(''); setShowDiseaseModal(true); };
+  const handleDiseaseSave = async () => {
+    if (!diseaseForm.disease) { setFormErr('Disease type required.'); return; }
+    setSaving(true);
+    const r = editingDisease ? await updateDisease(editingDisease.id, diseaseForm) : await reportDisease(diseaseForm);
+    setSaving(false);
+    if (r.success) { setShowDiseaseModal(false); loadStatistics(); }
+    else setFormErr(r.error);
+  };
+
+  // ── Medicine handlers ──
+  const openAddMed  = () => { setMedForm(emptyMed); setEditingMed(null); setFormErr(''); setShowMedModal(true); };
+  const openEditMed = (m) => { setMedForm({ name: m.name, category: m.category, unit: m.unit, quantity: m.quantity, lowStockAt: m.lowStockAt, expiryDate: m.expiryDate || '', supplier: m.supplier || '', notes: m.notes || '' }); setEditingMed(m); setFormErr(''); setShowMedModal(true); };
+  const handleMedSave = async () => {
+    if (!medForm.name.trim()) { setFormErr('Medicine name required.'); return; }
+    setSaving(true);
+    const r = editingMed ? await editMedicine(editingMed.id, medForm) : await createMedicine(medForm);
+    setSaving(false);
+    if (r.success) setShowMedModal(false);
+    else setFormErr(r.error);
+  };
+  const openDispense   = (m) => { setDispenseId(m.id); setDispenseQty(1); setShowDispense(true); };
+  const handleDispense = async () => { await dispense(dispenseId, dispenseQty); setShowDispense(false); };
+
+  const tabs = [
+    { id: 'appointments',  label: 'Appointments',        icon: Calendar  },
+    { id: 'immunizations', label: 'Immunizations',        icon: Syringe   },
+    { id: 'patients',      label: 'Patient Records',      icon: Clipboard },
+    { id: 'disease',       label: 'Disease Surveillance', icon: Activity  },
+    { id: 'pharmacy',      label: 'Pharmacy',             icon: Package   },
+  ];
+
+  const filteredAppts    = appointments.filter(a => !search || a.patientName?.toLowerCase().includes(search.toLowerCase()));
+  const filteredImms     = immunizations.filter(i => !search || i.patientName?.toLowerCase().includes(search.toLowerCase()) || i.vaccineName?.toLowerCase().includes(search.toLowerCase()));
+  const filteredDiseases = diseases.filter(d => !search || d.disease?.toLowerCase().includes(search.toLowerCase()) || d.patientName?.toLowerCase().includes(search.toLowerCase()));
+  const filteredMeds     = medicines.filter(m => !search || m.name?.toLowerCase().includes(search.toLowerCase()));
+  const lowStockMeds     = medicines.filter(m => (m.quantity || 0) <= (m.lowStockAt || 10));
 
   return (
     <div className="page-container">
-      {/* Page Header */}
       <div className="page-header">
         <div className="page-header-content">
           <h1 className="page-title">Health Services</h1>
           <p className="page-subtitle">Manage health programs and patient records</p>
         </div>
-        <div className="d-flex gap-3">
-          <button 
-            className="btn btn-secondary btn-md"
-            onClick={() => setShowImmunizationModal(true)}
+
+        {/* Action buttons */}
+        <div className="d-flex gap-2" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+
+          {/* ── AI Health Report button ── */}
+          <button
+            onClick={handleGenerateReport}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '9px 18px', borderRadius: 10, border: 'none',
+              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(99,102,241,0.35)',
+              transition: 'opacity 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
-            <Syringe size={18} />
-            Add Immunization
+            <Sparkles size={15} />
+            AI Health Report
           </button>
-          <button 
-            className="btn btn-primary btn-md"
-            onClick={() => setShowAppointmentModal(true)}
-          >
-            <Plus size={18} />
-            New Appointment
-          </button>
+
+          {activeTab === 'appointments'  && <button className="btn btn-primary btn-md" onClick={() => { setFormErr(''); setShowApptModal(true); }}><Plus size={18} /> New Appointment</button>}
+          {activeTab === 'immunizations' && <button className="btn btn-primary btn-md" onClick={() => { setFormErr(''); setShowImmModal(true); }}><Plus size={18} /> Add Immunization</button>}
+          {activeTab === 'disease'       && <button className="btn btn-primary btn-md" onClick={openAddDisease}><Plus size={18} /> Report Case</button>}
+          {activeTab === 'pharmacy'      && <button className="btn btn-primary btn-md" onClick={openAddMed}><Plus size={18} /> Add Medicine</button>}
         </div>
       </div>
 
-      {/* Error Alert */}
-      {error && (
-        <div className="card" style={{
-          background: 'var(--color-error-light)',
-          border: '1px solid var(--color-error)',
-          marginBottom: 'var(--space-6)'
-        }}>
-          <div className="card-body">
-            <div className="d-flex align-center justify-between">
-              <div className="d-flex align-center gap-3">
-                <AlertCircle size={24} style={{ color: 'var(--color-error)' }} />
-                <div>
-                  <h4 className="fw-semibold" style={{ color: 'var(--color-error)' }}>Error</h4>
-                  <p className="text-secondary">{error}</p>
-                </div>
-              </div>
-              <button className="btn-icon" onClick={clearError}>
-                <XCircle size={20} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Stats Grid */}
       <div className="stats-grid">
-        <StatCard 
-          title="Total Patients" 
-          value={stats?.totalPatients?.toString() || '0'} 
-          icon={Users}
-          iconBg="icon-bg-primary"
-          badge="Registered"
-          badgeColor="badge-primary"
-        />
-        <StatCard 
-          title="Appointments Today" 
-          value={stats?.todayAppointments?.toString() || '0'} 
-          icon={Calendar}
-          iconBg="icon-bg-secondary"
-          badge="Scheduled"
-          badgeColor="badge-secondary"
-        />
-        <StatCard 
-          title="Immunizations" 
-          value={stats?.totalImmunizations?.toString() || '0'} 
-          icon={Syringe}
-          iconBg="icon-bg-success"
-          badge="Total given"
-          badgeColor="badge-success"
-        />
-        <StatCard 
-          title="Consultations" 
-          value={stats?.consultationsThisMonth?.toString() || '0'} 
-          icon={Clipboard}
-          iconBg="icon-bg-warning"
-          badge="This month"
-          badgeColor="badge-warning"
-        />
+        <StatCard title="Patients"        value={stats?.totalPatients         || patients.length}     icon={Users}    iconBg="icon-bg-primary"  badge="Records"        badgeColor="badge-primary" />
+        <StatCard title="Appointments"    value={stats?.scheduledAppointments || 0}                   icon={Calendar} iconBg="icon-bg-success"  badge="Scheduled"      badgeColor="badge-success" />
+        <StatCard title="Active Diseases" value={stats?.activeDiseases        || 0}                   icon={Activity} iconBg="icon-bg-error"    badge="Cases"          badgeColor="badge-error" />
+        <StatCard title="Low Stock"       value={stats?.lowStockMedicines     || lowStockMeds.length} icon={Package}  iconBg="icon-bg-warning"  badge="Need restocking" badgeColor="badge-warning" />
       </div>
 
-      {/* Tabs */}
-      <div className="filters-section">
-        <div className="filter-buttons-group">
-          <button
-            onClick={() => setActiveTab('appointments')}
-            className={`filter-btn ${activeTab === 'appointments' ? 'active' : ''}`}
-          >
-            <Calendar size={18} />
-            Appointments
-          </button>
-          <button
-            onClick={() => setActiveTab('immunizations')}
-            className={`filter-btn ${activeTab === 'immunizations' ? 'active' : ''}`}
-          >
-            <Syringe size={18} />
-            Immunizations
-          </button>
-          <button
-            onClick={() => setActiveTab('patients')}
-            className={`filter-btn ${activeTab === 'patients' ? 'active' : ''}`}
-          >
-            <Users size={18} />
-            Patients
-          </button>
+      {/* Tabs + Search */}
+      <div className="filters-section mb-0">
+        <div className="filter-buttons-group" style={{ flexWrap: 'wrap' }}>
+          {tabs.map(t => { const Icon = t.icon; return (
+            <button key={t.id} className={`filter-btn ${activeTab === t.id ? 'active' : ''}`} onClick={() => setActiveTab(t.id)}>
+              <Icon size={15} /> {t.label}
+            </button>
+          ); })}
         </div>
-
-        <div className="action-buttons-group">
-          <div style={{ position: 'relative', minWidth: '250px' }}>
-            <Search
-              size={18}
-              style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--color-text-tertiary)'
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="form-input"
-              style={{ paddingLeft: '40px' }}
-            />
-          </div>
-          <button className="btn btn-secondary btn-md">
-            <Filter size={18} />
-            Filter
-          </button>
+        <div style={{ position: 'relative', minWidth: 220 }}>
+          <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
+          <input className="form-input" style={{ paddingLeft: 32 }} placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
-      {/* Content based on active tab */}
+      {error && <div className="alert alert-error mt-4">{error}<button className="btn-icon ml-2" onClick={clearError}><X size={14} /></button></div>}
+
+      {/* ── APPOINTMENTS ── */}
       {activeTab === 'appointments' && (
-        <div className="data-table-card">
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Patient</th>
-                  <th>Type</th>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && filteredAppointments.length === 0 ? (
-                  <tr>
-                    <td colSpan="6">
-                      <div className="empty-state">
-                        <Loader className="empty-state-icon animate-spin" />
-                        <h3 className="empty-state-title">Loading appointments...</h3>
-                      </div>
-                    </td>
-                  </tr>
-                ) : filteredAppointments.length > 0 ? (
-                  filteredAppointments.map((apt) => (
-                    <tr key={apt.id}>
-                      <td className="fw-semibold">{apt.appointmentTime || 'N/A'}</td>
-                      <td>{apt.patientName || 'N/A'}</td>
-                      <td className="text-secondary">{apt.appointmentType || 'N/A'}</td>
-                      <td className="text-secondary">{formatDate(apt.appointmentDate)}</td>
+        <div className="data-table-card mt-4">
+          <div className="table-header"><h3 className="table-title">Appointments</h3></div>
+          {loading ? <p className="p-4 text-secondary">Loading...</p> : filteredAppts.length === 0 ? (
+            <div className="empty-state"><Calendar className="empty-state-icon" /><h3 className="empty-state-title">No appointments</h3><button className="btn btn-primary btn-md mt-4" onClick={() => { setFormErr(''); setShowApptModal(true); }}><Plus size={16} /> Book Appointment</button></div>
+          ) : (
+            <div className="table-container">
+              <table className="data-table">
+                <thead><tr><th>Patient</th><th>Date</th><th>Time</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {filteredAppts.map(a => (
+                    <tr key={a.id}>
+                      <td className="fw-medium">{a.patientName}</td>
+                      <td className="text-secondary">{a.appointmentDate}</td>
+                      <td className="text-secondary">{a.appointmentTime}</td>
+                      <td><span className="badge badge-primary">{a.appointmentType}</span></td>
+                      <td><span className={`status-badge status-${a.status?.toLowerCase().replace(' ', '-')}`}>{a.status}</span></td>
                       <td>
-                        <span className={`status-badge status-${apt.status?.toLowerCase() || 'pending'}`}>
-                          {apt.status || 'Scheduled'}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="d-flex align-center gap-2">
-                          <button
-                            className="btn-icon btn-icon-sm"
-                            onClick={() => alert(`View appointment details for ${apt.patientName}`)}
-                            title="View"
-                          >
-                            <Eye size={16} />
-                          </button>
-                          {apt.status === 'Scheduled' && (
-                            <>
-                              <button
-                                className="btn-icon btn-icon-sm"
-                                onClick={() => handleStatusUpdate(apt.appointmentId, 'Confirmed')}
-                                title="Confirm"
-                                style={{ color: 'var(--color-success)' }}
-                              >
-                                <Check size={16} />
-                              </button>
-                              <button
-                                className="btn-icon btn-icon-sm"
-                                onClick={() => handleStatusUpdate(apt.appointmentId, 'Cancelled')}
-                                title="Cancel"
-                                style={{ color: 'var(--color-error)' }}
-                              >
-                                <X size={16} />
-                              </button>
-                            </>
-                          )}
+                        <div className="d-flex gap-1">
+                          {a.status === 'Scheduled' && <>
+                            <button className="btn-icon" style={{ color: 'var(--color-success)' }} onClick={() => updateAppointment(a.id, 'Completed')} title="Complete"><Check size={16} /></button>
+                            <button className="btn-icon" style={{ color: 'var(--color-error)' }}   onClick={() => updateAppointment(a.id, 'Cancelled')} title="Cancel"><X size={16} /></button>
+                          </>}
+                          <button className="btn-icon" style={{ color: 'var(--color-error)' }} onClick={() => { if (window.confirm('Delete?')) removeAppointment(a.id); }}><Trash2 size={15} /></button>
                         </div>
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="6">
-                      <div className="empty-state">
-                        <Calendar className="empty-state-icon" />
-                        <h3 className="empty-state-title">No appointments found</h3>
-                        <p className="empty-state-description">Click "New Appointment" to schedule one</p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
+      {/* ── IMMUNIZATIONS ── */}
       {activeTab === 'immunizations' && (
-        <div className="data-table-card">
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Patient</th>
-                  <th>Vaccine</th>
-                  <th>Dose</th>
-                  <th>Date Given</th>
-                  <th>Next Dose</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && filteredImmunizations.length === 0 ? (
-                  <tr>
-                    <td colSpan="6">
-                      <div className="empty-state">
-                        <Loader className="empty-state-icon animate-spin" />
-                        <h3 className="empty-state-title">Loading immunizations...</h3>
-                      </div>
-                    </td>
-                  </tr>
-                ) : filteredImmunizations.length > 0 ? (
-                  filteredImmunizations.map((imm) => (
-                    <tr key={imm.id}>
-                      <td className="fw-semibold">{imm.patientName || 'N/A'}</td>
-                      <td>{imm.vaccineName || 'N/A'}</td>
-                      <td className="text-secondary">Dose {imm.doseNumber || 1}</td>
-                      <td className="text-secondary">{formatDate(imm.dateAdministered)}</td>
-                      <td className="text-secondary">{formatDate(imm.nextDoseDate)}</td>
-                      <td>
-                        <button
-                          className="btn-icon btn-icon-sm"
-                          onClick={() => alert(`View immunization details`)}
-                          title="View"
-                        >
-                          <Eye size={16} />
-                        </button>
-                      </td>
+        <div className="data-table-card mt-4">
+          <div className="table-header"><h3 className="table-title">Immunization Records</h3></div>
+          {loading ? <p className="p-4 text-secondary">Loading...</p> : filteredImms.length === 0 ? (
+            <div className="empty-state"><Syringe className="empty-state-icon" /><h3 className="empty-state-title">No immunization records</h3><button className="btn btn-primary btn-md mt-4" onClick={() => { setFormErr(''); setShowImmModal(true); }}><Plus size={16} /> Add Record</button></div>
+          ) : (
+            <div className="table-container">
+              <table className="data-table">
+                <thead><tr><th>Patient</th><th>Vaccine</th><th>Dose</th><th>Next Dose</th><th>Date</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {filteredImms.map(i => (
+                    <tr key={i.id}>
+                      <td className="fw-medium">{i.patientName}</td>
+                      <td>{i.vaccineName}</td>
+                      <td><span className="badge badge-primary">Dose {i.doseNumber}</span></td>
+                      <td className="text-secondary">{i.nextDoseDate || '—'}</td>
+                      <td className="text-secondary">{fmtDate(i.systemInfo?.createdAt)}</td>
+                      <td><button className="btn-icon" style={{ color: 'var(--color-error)' }} onClick={() => { if (window.confirm('Delete?')) removeImmunization(i.id); }}><Trash2 size={15} /></button></td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="6">
-                      <div className="empty-state">
-                        <Syringe className="empty-state-icon" />
-                        <h3 className="empty-state-title">No immunizations found</h3>
-                        <p className="empty-state-description">Click "Add Immunization" to record one</p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
+      {/* ── PATIENTS ── */}
       {activeTab === 'patients' && (
-        <div className="data-table-card">
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Record ID</th>
-                  <th>Patient Name</th>
-                  <th>Age</th>
-                  <th>Blood Type</th>
-                  <th>Last Visit</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && patients.length === 0 ? (
-                  <tr>
-                    <td colSpan="6">
-                      <div className="empty-state">
-                        <Loader className="empty-state-icon animate-spin" />
-                        <h3 className="empty-state-title">Loading patients...</h3>
-                      </div>
-                    </td>
-                  </tr>
-                ) : patients.length > 0 ? (
-                  patients.map((patient) => (
-                    <tr key={patient.id}>
-                      <td className="fw-semibold text-primary">{patient.recordId || 'N/A'}</td>
-                      <td>{patient.patientInfo?.name || 'N/A'}</td>
-                      <td className="text-secondary">{patient.patientInfo?.age || 'N/A'}</td>
-                      <td className="text-secondary">{patient.patientInfo?.bloodType || 'N/A'}</td>
-                      <td className="text-secondary">
-                        {patient.consultations?.length > 0 
-                          ? formatDate(patient.consultations[patient.consultations.length - 1].date)
-                          : 'No visits'}
-                      </td>
+        <div className="data-table-card mt-4">
+          <div className="table-header"><h3 className="table-title">Patient Records</h3></div>
+          {loading ? <p className="p-4 text-secondary">Loading...</p> : patients.length === 0 ? (
+            <div className="empty-state"><Clipboard className="empty-state-icon" /><h3 className="empty-state-title">No patient records</h3><p className="empty-state-description">Patient records are created when appointments are booked</p></div>
+          ) : (
+            <div className="table-container">
+              <table className="data-table">
+                <thead><tr><th>Record ID</th><th>Name</th><th>Gender</th><th>Blood Type</th><th>Conditions</th><th>Consultations</th></tr></thead>
+                <tbody>
+                  {patients.filter(p => !search || p.patientName?.toLowerCase().includes(search.toLowerCase())).map(p => (
+                    <tr key={p.id}>
+                      <td className="text-secondary" style={{ fontFamily: 'monospace' }}>{p.recordId}</td>
+                      <td className="fw-medium">{p.patientName}</td>
+                      <td>{p.gender || '—'}</td>
+                      <td>{p.bloodType || '—'}</td>
+                      <td className="text-secondary">{p.conditions || '—'}</td>
+                      <td><span className="badge badge-primary">{(p.consultations || []).length}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── DISEASE SURVEILLANCE ── */}
+      {activeTab === 'disease' && (
+        <div className="data-table-card mt-4">
+          <div className="table-header">
+            <h3 className="table-title">Disease Surveillance</h3>
+            <button className="btn btn-primary btn-sm" onClick={openAddDisease}><Plus size={15} /> Report Case</button>
+          </div>
+          {loading ? <p className="p-4 text-secondary">Loading...</p> : filteredDiseases.length === 0 ? (
+            <div className="empty-state"><Activity className="empty-state-icon" /><h3 className="empty-state-title">No disease cases reported</h3><button className="btn btn-primary btn-md mt-4" onClick={openAddDisease}><Plus size={16} /> Report First Case</button></div>
+          ) : (
+            <div className="table-container">
+              <table className="data-table">
+                <thead><tr><th>Disease</th><th>Patient</th><th>Purok</th><th>Age</th><th>Date Onset</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {filteredDiseases.map(d => (
+                    <tr key={d.id}>
+                      <td><span className="badge badge-error">{d.disease}</span></td>
+                      <td className="fw-medium">{d.patientName}</td>
+                      <td className="text-secondary">{d.purok || '—'}</td>
+                      <td className="text-secondary">{d.age || '—'}</td>
+                      <td className="text-secondary">{d.dateOnset || '—'}</td>
+                      <td><span className={`status-badge status-${d.status?.toLowerCase()}`}>{d.status}</span></td>
                       <td>
-                        <button
-                          className="btn-icon btn-icon-sm"
-                          onClick={() => alert(`View patient details`)}
-                          title="View"
-                        >
-                          <Eye size={16} />
-                        </button>
+                        <div className="d-flex gap-1">
+                          <button className="btn-icon" onClick={() => openEditDisease(d)}><Edit size={15} /></button>
+                          <button className="btn-icon" style={{ color: 'var(--color-error)' }} onClick={() => { if (window.confirm('Delete?')) removeDisease(d.id); }}><Trash2 size={15} /></button>
+                        </div>
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="6">
-                      <div className="empty-state">
-                        <Users className="empty-state-icon" />
-                        <h3 className="empty-state-title">No patients found</h3>
-                        <p className="empty-state-description">Patient records will appear here</p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── PHARMACY ── */}
+      {activeTab === 'pharmacy' && (
+        <div className="data-table-card mt-4">
+          <div className="table-header">
+            <h3 className="table-title">Medicine Inventory</h3>
+            <div className="d-flex gap-2 align-center">
+              {lowStockMeds.length > 0 && <span className="badge badge-warning">{lowStockMeds.length} low stock</span>}
+              <button className="btn btn-primary btn-sm" onClick={openAddMed}><Plus size={15} /> Add Medicine</button>
+            </div>
+          </div>
+          {loading ? <p className="p-4 text-secondary">Loading...</p> : filteredMeds.length === 0 ? (
+            <div className="empty-state"><Package className="empty-state-icon" /><h3 className="empty-state-title">No medicines in inventory</h3><button className="btn btn-primary btn-md mt-4" onClick={openAddMed}><Plus size={16} /> Add First Medicine</button></div>
+          ) : (
+            <div className="table-container">
+              <table className="data-table">
+                <thead><tr><th>Medicine</th><th>Category</th><th>Stock</th><th>Unit</th><th>Expiry</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {filteredMeds.map(m => {
+                    const isLow = (m.quantity || 0) <= (m.lowStockAt || 10);
+                    return (
+                      <tr key={m.id}>
+                        <td className="fw-medium">{m.name}</td>
+                        <td className="text-secondary">{m.category}</td>
+                        <td><span className={`fw-semibold ${isLow ? 'text-error' : ''}`}>{m.quantity}</span></td>
+                        <td className="text-secondary">{m.unit}</td>
+                        <td className="text-secondary">{m.expiryDate || '—'}</td>
+                        <td><span className={`badge badge-${isLow ? 'error' : 'success'}`}>{isLow ? 'Low Stock' : 'OK'}</span></td>
+                        <td>
+                          <div className="d-flex gap-1">
+                            <button className="btn btn-ghost btn-sm" onClick={() => openDispense(m)}>Dispense</button>
+                            <button className="btn-icon" onClick={() => openEditMed(m)}><Edit size={15} /></button>
+                            <button className="btn-icon" style={{ color: 'var(--color-error)' }} onClick={() => { if (window.confirm('Delete?')) removeMedicine(m.id); }}><Trash2 size={15} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── AI HEALTH REPORT MODAL ── */}
+      {showReportModal && (
+        <div className="modal-overlay" onClick={() => !reportLoading && setShowReportModal(false)}>
+          <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: 640, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+
+            {/* Header */}
+            <div className="modal-header" style={{ background: 'linear-gradient(135deg, #faf5ff, #eff6ff)', borderBottom: '1px solid #e9d5ff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Sparkles size={16} color="#7c3aed" />
+                </div>
+                <div>
+                  <h2 className="modal-title" style={{ color: '#4c1d95' }}>AI Health Situation Report</h2>
+                  <p style={{ fontSize: 12, color: '#7c3aed', margin: 0 }}>
+                    Generated from {diseases.length} disease cases · {appointments.length} appointments · {medicines.length} medicines
+                  </p>
+                </div>
+              </div>
+              <button className="btn-icon" onClick={() => setShowReportModal(false)} disabled={reportLoading}><X size={20} /></button>
+            </div>
+
+            {/* Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+              {reportLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 0', gap: 14 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 12, background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Sparkles size={22} color="#7c3aed" style={{ animation: 'spin 2s linear infinite' }} />
+                  </div>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: '#4c1d95', margin: 0 }}>Analyzing health data...</p>
+                  <p style={{ fontSize: 13, color: '#7c3aed', margin: 0 }}>AI is writing your report</p>
+                </div>
+              ) : reportError ? (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '16px', color: '#dc2626', fontSize: 14 }}>
+                  {reportError}
+                </div>
+              ) : (
+                <div style={{
+                  background: '#fafafa', border: '1px solid #e2e8f0',
+                  borderRadius: 12, padding: '20px 24px',
+                  fontSize: 13, lineHeight: 1.8, color: '#1e293b',
+                  whiteSpace: 'pre-wrap', fontFamily: "'Georgia', serif",
+                }}>
+                  {reportText}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            {!reportLoading && reportText && (
+              <div className="modal-footer" style={{ borderTop: '1px solid #e9d5ff', background: '#faf5ff' }}>
+                <button className="btn btn-secondary btn-md" onClick={() => setShowReportModal(false)}>Close</button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={handleGenerateReport} style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
+                    borderRadius: 8, border: '1px solid #c4b5fd', background: '#fff',
+                    color: '#7c3aed', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}>
+                    <Sparkles size={14} /> Regenerate
+                  </button>
+                  <button onClick={handleCopyReport} style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
+                    borderRadius: 8, border: 'none',
+                    background: copied ? '#10b981' : '#7c3aed',
+                    color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    transition: 'background 0.2s',
+                  }}>
+                    {copied ? <><CheckCheck size={14} /> Copied!</> : <><Copy size={14} /> Copy Report</>}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Appointment Modal */}
-      {showAppointmentModal && (
-        <div className="modal-overlay" onClick={() => setShowAppointmentModal(false)}>
-          <div className="modal" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">New Appointment</h3>
-              <button className="btn-icon" onClick={() => setShowAppointmentModal(false)}>
-                <XCircle size={20} />
-              </button>
+      {/* ── APPOINTMENT MODAL ── */}
+      {showApptModal && (
+        <div className="modal-overlay" onClick={() => setShowApptModal(false)}>
+          <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div className="modal-header"><h2 className="modal-title">Book Appointment</h2><button className="btn-icon" onClick={() => setShowApptModal(false)}><X size={20} /></button></div>
+            <div className="modal-body">
+              {formErr && <div className="alert alert-error mb-3">{formErr}</div>}
+              <div className="form-group"><label className="form-label">Patient Name *</label><input className="form-input" value={apptForm.patientName} onChange={e => setApptForm(p => ({ ...p, patientName: e.target.value }))} placeholder="Full name" /></div>
+              <div className="grid-2" style={{ gap: 12 }}>
+                <div className="form-group"><label className="form-label">Date *</label><input type="date" className="form-input" value={apptForm.appointmentDate} onChange={e => setApptForm(p => ({ ...p, appointmentDate: e.target.value }))} /></div>
+                <div className="form-group"><label className="form-label">Time</label><input type="time" className="form-input" value={apptForm.appointmentTime} onChange={e => setApptForm(p => ({ ...p, appointmentTime: e.target.value }))} /></div>
+              </div>
+              <div className="form-group"><label className="form-label">Type</label><select className="form-select" value={apptForm.appointmentType} onChange={e => setApptForm(p => ({ ...p, appointmentType: e.target.value }))}>{APPT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+              <div className="form-group"><label className="form-label">Notes</label><textarea className="form-input" rows={3} value={apptForm.notes} onChange={e => setApptForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes" /></div>
             </div>
-            <form onSubmit={handleAppointmentSubmit}>
-              <div className="modal-body">
-                <div className="d-flex flex-column gap-4">
-                  <div className="form-group">
-                    <label className="form-label">Patient Name *</label>
-                    <input
-                      type="text"
-                      name="patientName"
-                      value={appointmentForm.patientName}
-                      onChange={handleAppointmentChange}
-                      className="form-input"
-                      placeholder="Enter patient name"
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Resident ID (Optional)</label>
-                    <input
-                      type="text"
-                      name="residentId"
-                      value={appointmentForm.residentId}
-                      onChange={handleAppointmentChange}
-                      className="form-input"
-                      placeholder="RES-2024-0001"
-                    />
-                  </div>
-
-                  <div className="grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Appointment Date *</label>
-                      <input
-                        type="date"
-                        name="appointmentDate"
-                        value={appointmentForm.appointmentDate}
-                        onChange={handleAppointmentChange}
-                        className="form-input"
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">Time *</label>
-                      <input
-                        type="time"
-                        name="appointmentTime"
-                        value={appointmentForm.appointmentTime}
-                        onChange={handleAppointmentChange}
-                        className="form-input"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Appointment Type *</label>
-                    <select
-                      name="appointmentType"
-                      value={appointmentForm.appointmentType}
-                      onChange={handleAppointmentChange}
-                      className="form-select"
-                      required
-                    >
-                      <option value="consultation">General Consultation</option>
-                      <option value="prenatal">Pre-natal Check-up</option>
-                      <option value="immunization">Immunization</option>
-                      <option value="followup">Follow-up</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Notes</label>
-                    <textarea
-                      name="notes"
-                      value={appointmentForm.notes}
-                      onChange={handleAppointmentChange}
-                      className="form-input"
-                      rows="3"
-                      placeholder="Additional notes..."
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={() => setShowAppointmentModal(false)}
-                  disabled={loading}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader size={16} className="animate-spin" />
-                      Booking...
-                    </>
-                  ) : (
-                    <>
-                      <Calendar size={16} />
-                      Book Appointment
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-md" onClick={() => setShowApptModal(false)} disabled={saving}>Cancel</button>
+              <button className="btn btn-primary btn-md" onClick={handleApptSave} disabled={saving}><Save size={16} />{saving ? 'Saving...' : 'Book Appointment'}</button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Immunization Modal */}
-      {showImmunizationModal && (
-        <div className="modal-overlay" onClick={() => setShowImmunizationModal(false)}>
-          <div className="modal" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Add Immunization Record</h3>
-              <button className="btn-icon" onClick={() => setShowImmunizationModal(false)}>
-                <XCircle size={20} />
-              </button>
+      {/* ── IMMUNIZATION MODAL ── */}
+      {showImmModal && (
+        <div className="modal-overlay" onClick={() => setShowImmModal(false)}>
+          <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div className="modal-header"><h2 className="modal-title">Add Immunization Record</h2><button className="btn-icon" onClick={() => setShowImmModal(false)}><X size={20} /></button></div>
+            <div className="modal-body">
+              {formErr && <div className="alert alert-error mb-3">{formErr}</div>}
+              <div className="form-group"><label className="form-label">Patient Name *</label><input className="form-input" value={immForm.patientName} onChange={e => setImmForm(p => ({ ...p, patientName: e.target.value }))} placeholder="Full name" /></div>
+              <div className="grid-2" style={{ gap: 12 }}>
+                <div className="form-group"><label className="form-label">Vaccine *</label><select className="form-select" value={immForm.vaccineName} onChange={e => setImmForm(p => ({ ...p, vaccineName: e.target.value }))}><option value="">Select vaccine</option>{VACCINES.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
+                <div className="form-group"><label className="form-label">Dose #</label><input type="number" className="form-input" value={immForm.doseNumber} min="1" onChange={e => setImmForm(p => ({ ...p, doseNumber: Number(e.target.value) }))} /></div>
+              </div>
+              <div className="form-group"><label className="form-label">Next Dose Date</label><input type="date" className="form-input" value={immForm.nextDoseDate} onChange={e => setImmForm(p => ({ ...p, nextDoseDate: e.target.value }))} /></div>
+              <div className="form-group"><label className="form-label">Remarks</label><input className="form-input" value={immForm.remarks} onChange={e => setImmForm(p => ({ ...p, remarks: e.target.value }))} /></div>
             </div>
-            <form onSubmit={handleImmunizationSubmit}>
-              <div className="modal-body">
-                <div className="d-flex flex-column gap-4">
-                  <div className="form-group">
-                    <label className="form-label">Patient Name *</label>
-                    <input
-                      type="text"
-                      name="patientName"
-                      value={immunizationForm.patientName}
-                      onChange={handleImmunizationChange}
-                      className="form-input"
-                      placeholder="Enter patient name"
-                      required
-                    />
-                  </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-md" onClick={() => setShowImmModal(false)} disabled={saving}>Cancel</button>
+              <button className="btn btn-primary btn-md" onClick={handleImmSave} disabled={saving}><Save size={16} />{saving ? 'Saving...' : 'Add Record'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                  <div className="form-group">
-                    <label className="form-label">Resident ID (Optional)</label>
-                    <input
-                      type="text"
-                      name="residentId"
-                      value={immunizationForm.residentId}
-                      onChange={handleImmunizationChange}
-                      className="form-input"
-                      placeholder="RES-2024-0001"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Vaccine Name *</label>
-                    <select
-                      name="vaccineName"
-                      value={immunizationForm.vaccineName}
-                      onChange={handleImmunizationChange}
-                      className="form-select"
-                      required
-                    >
-                      <option value="">Select vaccine</option>
-                      <option value="BCG">BCG</option>
-                      <option value="Hepatitis B">Hepatitis B</option>
-                      <option value="DPT">DPT</option>
-                      <option value="OPV">OPV (Oral Polio)</option>
-                      <option value="MMR">MMR (Measles, Mumps, Rubella)</option>
-                      <option value="Influenza">Influenza</option>
-                      <option value="COVID-19">COVID-19</option>
-                    </select>
-                  </div>
-
-                  <div className="grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Dose Number *</label>
-                      <input
-                        type="number"
-                        name="doseNumber"
-                        value={immunizationForm.doseNumber}
-                        onChange={handleImmunizationChange}
-                        className="form-input"
-                        min="1"
-                        max="5"
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">Next Dose Date</label>
-                      <input
-                        type="date"
-                        name="nextDoseDate"
-                        value={immunizationForm.nextDoseDate}
-                        onChange={handleImmunizationChange}
-                        className="form-input"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Remarks</label>
-                    <textarea
-                      name="remarks"
-                      value={immunizationForm.remarks}
-                      onChange={handleImmunizationChange}
-                      className="form-input"
-                      rows="3"
-                      placeholder="Additional remarks..."
-                    />
-                  </div>
-                </div>
+      {/* ── DISEASE MODAL ── */}
+      {showDiseaseModal && (
+        <div className="modal-overlay" onClick={() => setShowDiseaseModal(false)}>
+          <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div className="modal-header"><h2 className="modal-title">{editingDisease ? 'Edit Case' : 'Report Disease Case'}</h2><button className="btn-icon" onClick={() => setShowDiseaseModal(false)}><X size={20} /></button></div>
+            <div className="modal-body">
+              {formErr && <div className="alert alert-error mb-3">{formErr}</div>}
+              <div className="grid-2" style={{ gap: 12 }}>
+                <div className="form-group"><label className="form-label">Disease *</label><select className="form-select" value={diseaseForm.disease} onChange={e => setDiseaseForm(p => ({ ...p, disease: e.target.value }))}>{DISEASES.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+                <div className="form-group"><label className="form-label">Status</label><select className="form-select" value={diseaseForm.status} onChange={e => setDiseaseForm(p => ({ ...p, status: e.target.value }))}>{['Active','Recovered','Deceased'].map(s => <option key={s} value={s}>{s}</option>)}</select></div>
               </div>
-              <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={() => setShowImmunizationModal(false)}
-                  disabled={loading}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader size={16} className="animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Syringe size={16} />
-                      Add Record
-                    </>
-                  )}
-                </button>
+              <div className="form-group"><label className="form-label">Patient Name</label><input className="form-input" value={diseaseForm.patientName} onChange={e => setDiseaseForm(p => ({ ...p, patientName: e.target.value }))} placeholder="Anonymous if unknown" /></div>
+              <div className="grid-2" style={{ gap: 12 }}>
+                <div className="form-group"><label className="form-label">Purok</label><input className="form-input" value={diseaseForm.purok} onChange={e => setDiseaseForm(p => ({ ...p, purok: e.target.value }))} placeholder="e.g. Purok 3" /></div>
+                <div className="form-group"><label className="form-label">Date Onset</label><input type="date" className="form-input" value={diseaseForm.dateOnset} onChange={e => setDiseaseForm(p => ({ ...p, dateOnset: e.target.value }))} /></div>
               </div>
-            </form>
+              <div className="grid-2" style={{ gap: 12 }}>
+                <div className="form-group"><label className="form-label">Age</label><input className="form-input" value={diseaseForm.age} onChange={e => setDiseaseForm(p => ({ ...p, age: e.target.value }))} placeholder="Age" /></div>
+                <div className="form-group"><label className="form-label">Gender</label><select className="form-select" value={diseaseForm.gender} onChange={e => setDiseaseForm(p => ({ ...p, gender: e.target.value }))}><option value="">Select</option><option>Male</option><option>Female</option></select></div>
+              </div>
+              <div className="form-group"><label className="form-label">Notes</label><textarea className="form-input" rows={2} value={diseaseForm.notes} onChange={e => setDiseaseForm(p => ({ ...p, notes: e.target.value }))} /></div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-md" onClick={() => setShowDiseaseModal(false)} disabled={saving}>Cancel</button>
+              <button className="btn btn-primary btn-md" onClick={handleDiseaseSave} disabled={saving}><Save size={16} />{saving ? 'Saving...' : editingDisease ? 'Update' : 'Report Case'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MEDICINE MODAL ── */}
+      {showMedModal && (
+        <div className="modal-overlay" onClick={() => setShowMedModal(false)}>
+          <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div className="modal-header"><h2 className="modal-title">{editingMed ? 'Edit Medicine' : 'Add Medicine'}</h2><button className="btn-icon" onClick={() => setShowMedModal(false)}><X size={20} /></button></div>
+            <div className="modal-body">
+              {formErr && <div className="alert alert-error mb-3">{formErr}</div>}
+              <div className="form-group"><label className="form-label">Medicine Name *</label><input className="form-input" value={medForm.name} onChange={e => setMedForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Amoxicillin 500mg" /></div>
+              <div className="grid-2" style={{ gap: 12 }}>
+                <div className="form-group"><label className="form-label">Category</label><select className="form-select" value={medForm.category} onChange={e => setMedForm(p => ({ ...p, category: e.target.value }))}>{MED_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                <div className="form-group"><label className="form-label">Unit</label><input className="form-input" value={medForm.unit} onChange={e => setMedForm(p => ({ ...p, unit: e.target.value }))} placeholder="pcs / tablets / ml" /></div>
+              </div>
+              <div className="grid-2" style={{ gap: 12 }}>
+                <div className="form-group"><label className="form-label">Quantity</label><input type="number" className="form-input" value={medForm.quantity} onChange={e => setMedForm(p => ({ ...p, quantity: e.target.value }))} min="0" /></div>
+                <div className="form-group"><label className="form-label">Low Stock Alert At</label><input type="number" className="form-input" value={medForm.lowStockAt} onChange={e => setMedForm(p => ({ ...p, lowStockAt: Number(e.target.value) }))} min="1" /></div>
+              </div>
+              <div className="grid-2" style={{ gap: 12 }}>
+                <div className="form-group"><label className="form-label">Expiry Date</label><input type="date" className="form-input" value={medForm.expiryDate} onChange={e => setMedForm(p => ({ ...p, expiryDate: e.target.value }))} /></div>
+                <div className="form-group"><label className="form-label">Supplier</label><input className="form-input" value={medForm.supplier} onChange={e => setMedForm(p => ({ ...p, supplier: e.target.value }))} placeholder="Optional" /></div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-md" onClick={() => setShowMedModal(false)} disabled={saving}>Cancel</button>
+              <button className="btn btn-primary btn-md" onClick={handleMedSave} disabled={saving}><Save size={16} />{saving ? 'Saving...' : editingMed ? 'Update' : 'Add Medicine'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DISPENSE MODAL ── */}
+      {showDispense && (
+        <div className="modal-overlay" onClick={() => setShowDispense(false)}>
+          <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: 360 }}>
+            <div className="modal-header"><h2 className="modal-title">Dispense Medicine</h2><button className="btn-icon" onClick={() => setShowDispense(false)}><X size={20} /></button></div>
+            <div className="modal-body">
+              <div className="form-group"><label className="form-label">Quantity to Dispense</label><input type="number" className="form-input" value={dispenseQty} min="1" onChange={e => setDispenseQty(Number(e.target.value))} /></div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-md" onClick={() => setShowDispense(false)}>Cancel</button>
+              <button className="btn btn-primary btn-md" onClick={handleDispense}><Save size={16} /> Dispense</button>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
-};
-
-export default HealthServices;
+}

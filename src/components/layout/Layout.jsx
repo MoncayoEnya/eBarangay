@@ -39,9 +39,9 @@ export default function Layout({ children }) {
     { path: '/incidents', icon: AlertTriangle, label: 'Incidents' },
     { path: '/announcements', icon: Megaphone, label: 'Announcements' },
     { path: '/events', icon: Calendar, label: 'Events' },
-    { path: '/health', icon: Heart, label: 'Health Services' },
-    { path: '/welfare', icon: HandHeart, label: 'Social Welfare' },
-    { path: '/waste', icon: Recycle, label: 'Waste Management' },
+    { path: '/health-services', icon: Heart, label: 'Health Services' },
+    { path: '/social-welfare', icon: HandHeart, label: 'Social Welfare' },
+    { path: '/waste-management', icon: Recycle, label: 'Waste Management' },
     { path: '/finance', icon: DollarSign, label: 'Finance' },
     { path: '/drrm', icon: ShieldIcon, label: 'DRRM' },
     { path: '/settings', icon: Settings, label: 'Settings' }

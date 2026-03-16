@@ -220,7 +220,7 @@ export const createDocumentRequest = async (requestData, currentUserId) => {
       
       timeline: [{
         status: 'Pending',
-        timestamp: serverTimestamp(),
+        timestamp: Timestamp.now(),
         userId: currentUserId,
         notes: 'Request submitted'
       }],
@@ -291,15 +291,16 @@ export const getDocumentById = async (documentId) => {
 export const getAllDocuments = async (filters = {}) => {
   try {
     const docsRef = collection(db, COLLECTION_NAME);
-    let q = query(docsRef, orderBy('systemInfo.createdAt', 'desc'));
+    const pageLimit = filters.limit || 50;
+    let q = query(docsRef, orderBy('systemInfo.createdAt', 'desc'), limit(pageLimit));
 
     // Apply filters
     if (filters.status) {
-      q = query(docsRef, where('status', '==', filters.status), orderBy('systemInfo.createdAt', 'desc'));
+      q = query(docsRef, where('status', '==', filters.status), orderBy('systemInfo.createdAt', 'desc'), limit(pageLimit));
     }
 
     if (filters.documentType) {
-      q = query(docsRef, where('documentTypeId', '==', filters.documentType), orderBy('systemInfo.createdAt', 'desc'));
+      q = query(docsRef, where('documentTypeId', '==', filters.documentType), orderBy('systemInfo.createdAt', 'desc'), limit(pageLimit));
     }
 
     const querySnapshot = await getDocs(q);
@@ -387,7 +388,7 @@ export const updateDocumentStatus = async (documentId, newStatus, userId, notes 
     // Add to timeline
     timeline.push({
       status: newStatus,
-      timestamp: serverTimestamp(),
+      timestamp: Timestamp.now(),
       userId,
       notes
     });

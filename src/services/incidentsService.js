@@ -119,11 +119,13 @@ export const getAllIncidents = async (filters = {}) => {
     let q = query(incidentsRef, orderBy('systemInfo.createdAt', 'desc'));
 
     if (filters.status) {
-      q = query(incidentsRef, where('status', '==', filters.status), orderBy('systemInfo.createdAt', 'desc'));
+      // No orderBy here — avoids needing a composite index
+      q = query(incidentsRef, where('status', '==', filters.status));
     }
 
     if (filters.category) {
-      q = query(incidentsRef, where('category', '==', filters.category), orderBy('systemInfo.createdAt', 'desc'));
+      // No orderBy here — avoids needing a composite index
+      q = query(incidentsRef, where('category', '==', filters.category));
     }
 
     const querySnapshot = await getDocs(q);
@@ -134,6 +136,13 @@ export const getAllIncidents = async (filters = {}) => {
         id: doc.id,
         ...doc.data()
       });
+    });
+
+    // Sort client-side so we don't need composite indexes
+    incidents.sort((a, b) => {
+      const aTime = a.systemInfo?.createdAt?.toMillis?.() || 0;
+      const bTime = b.systemInfo?.createdAt?.toMillis?.() || 0;
+      return bTime - aTime;
     });
 
     return {
@@ -184,7 +193,8 @@ export const searchIncidents = async (searchTerm, filters = {}) => {
     let q = query(incidentsRef, orderBy('systemInfo.createdAt', 'desc'));
 
     if (filters.status) {
-      q = query(incidentsRef, where('status', '==', filters.status), orderBy('systemInfo.createdAt', 'desc'));
+      // No orderBy — avoids composite index requirement
+      q = query(incidentsRef, where('status', '==', filters.status));
     }
 
     const querySnapshot = await getDocs(q);
@@ -195,6 +205,13 @@ export const searchIncidents = async (searchTerm, filters = {}) => {
         id: doc.id,
         ...doc.data()
       });
+    });
+
+    // Sort client-side
+    incidents.sort((a, b) => {
+      const aTime = a.systemInfo?.createdAt?.toMillis?.() || 0;
+      const bTime = b.systemInfo?.createdAt?.toMillis?.() || 0;
+      return bTime - aTime;
     });
 
     if (searchTerm) {

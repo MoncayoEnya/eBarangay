@@ -3,12 +3,12 @@
    ============================================ */
 
 /* Import Google Fonts */
-@import url(https://northbendne.org/wp-content/uploads/2020/09/images2921-5f50a546937fd.jpg);
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 /* Main Container with Background Image */
 .signup-container {
   min-height: 100vh;
-  background-image: url(https://northbendne.org/wp-content/uploads/2020/09/images2921-5f50a546937fd.jpg);
+  background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 50%, #4F46E5 100%);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -29,9 +29,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(30, 64, 175, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background-image: radial-gradient(circle at 20% 80%, rgba(255,255,255,0.06) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,255,255,0.04) 0%, transparent 50%);
   z-index: 0;
 }
 

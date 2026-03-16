@@ -1,399 +1,48 @@
-/* ============================================
-   TOPBAR STYLES - MODERN & PROFESSIONAL
-   ============================================ */
-
-/* Main Topbar Container */
-.topbar,
-header {
+/* ── Topbar ── */
+.topbar, header.topbar {
   background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid var(--color-border-light);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.05);
   position: sticky;
   top: 0;
   z-index: 100;
-  transition: all 0.3s ease;
 }
 
-/* Add backdrop blur effect on scroll */
-.topbar.scrolled,
-header.scrolled {
-  backdrop-filter: blur(12px);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
-}
-
-/* Search Container Improvements */
-.topbar .search-container,
-header .flex.items-center.gap-3.px-4 {
-  position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Search Input Base Styles */
-input[type="text"],
-input[placeholder*="Search"] {
-  background: #f9fafb;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 11px 16px 11px 44px;
-  font-size: 14px;
-  font-weight: 400;
-  color: #111827;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  width: 100%;
-}
-
-input[type="text"]::placeholder,
-input[placeholder*="Search"]::placeholder {
-  color: #9ca3af;
-  font-weight: 400;
-}
-
-/* Search Input Focus State */
-input[type="text"]:focus,
-input[placeholder*="Search"]:focus {
-  background: #ffffff;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+/* Search box — scoped so it doesn't bleed into forms */
+.topbar-search,
+.topbar input[type="text"] {
+  background: var(--color-gray-50);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 9px 16px 9px 42px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-primary);
+  transition: all var(--transition-fast);
   outline: none;
-  transform: translateY(-1px);
-}
-
-/* Search Icon */
-.search-icon,
-svg.w-4.h-4 {
-  color: #9ca3af;
-  transition: color 0.3s ease;
-}
-
-input:focus ~ .search-icon,
-input:focus + svg {
-  color: #3b82f6;
-}
-
-/* Keyboard Shortcut Badge */
-kbd,
-.kbd {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 8px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #6b7280;
-  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  transition: all 0.2s ease;
-}
-
-input:focus ~ kbd {
-  border-color: #3b82f6;
-  color: #3b82f6;
-  background: #eff6ff;
-}
-
-/* Icon Buttons - Universal */
-button.p-2,
-button.p-2\\.5,
-.icon-button,
-button[title] {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: transparent;
-  color: #6b7280;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-}
-
-button.p-2:hover,
-button.p-2\\.5:hover,
-.icon-button:hover,
-button[title]:hover {
-  background: #f3f4f6;
-  color: #111827;
-  transform: translateY(-1px);
-}
-
-button.p-2:active,
-button.p-2\\.5:active,
-.icon-button:active,
-button[title]:active {
-  transform: translateY(0) scale(0.95);
-}
-
-/* Notification Button with Badge */
-button.relative {
-  position: relative;
-}
-
-.notification-badge,
-span.absolute.top-2.right-2 {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  color: #ffffff;
-  font-size: 11px;
-  font-weight: 700;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #ffffff;
-  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
-  animation: pulse-badge 2s ease-in-out infinite;
-}
-
-@keyframes pulse-badge {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
-  }
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.4);
-  }
-}
-
-/* Divider */
-.w-px {
-  width: 1px;
-  height: 32px;
-  background: linear-gradient(to bottom, transparent, #e5e7eb, transparent);
-}
-
-/* User Menu Button */
-.user-menu,
-button.flex.items-center.gap-3 {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 12px 6px 6px;
-  background: transparent;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 2px solid transparent;
-}
-
-.user-menu:hover,
-button.flex.items-center.gap-3:hover {
-  background: #f9fafb;
-  border-color: #e5e7eb;
-  transform: translateY(-1px);
-}
-
-.user-menu:active,
-button.flex.items-center.gap-3:active {
-  transform: translateY(0) scale(0.98);
-}
-
-/* User Avatar */
-.user-avatar,
-div.w-9.h-9,
-div[class*="from-blue-600"] {
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3),
-              0 2px 4px -1px rgba(59, 130, 246, 0.2);
-  transition: all 0.3s ease;
-}
-
-.user-avatar:hover,
-div.w-9.h-9:hover {
-  box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4),
-              0 4px 6px -2px rgba(59, 130, 246, 0.3);
-  transform: translateY(-2px) scale(1.05);
-}
-
-/* User Info Text */
-.user-info p,
-div.text-left p {
-  margin: 0;
-  line-height: 1.3;
-  transition: color 0.2s ease;
-}
-
-.user-name,
-p.text-sm.font-semibold {
-  font-size: 14px;
-  font-weight: 600;
-  color: #111827;
-  letter-spacing: -0.01em;
-}
-
-.user-role,
-p.text-xs.text-gray-500 {
-  font-size: 12px;
-  font-weight: 500;
-  color: #6b7280;
-}
-
-/* Chevron Icon Animation */
-svg[class*="ChevronDown"],
-.chevron-icon {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-svg[class*="rotate-180"] {
-  transform: rotate(180deg);
-}
-
-/* Dropdown Menu */
-div.absolute.right-0.mt-2,
-.dropdown-menu {
-  min-width: 260px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
-              0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  padding: 8px;
-  animation: dropdown-appear 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  transform-origin: top right;
-}
-
-@keyframes dropdown-appear {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-/* Dropdown Header */
-div.px-4.py-3.border-b {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f3f4f6;
-  margin-bottom: 4px;
-}
-
-/* Dropdown Menu Items */
-button.w-full.flex.items-center,
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   width: 100%;
-  padding: 10px 12px;
-  background: transparent;
-  border: none;
-  border-radius: 10px;
-  text-align: left;
-  font-size: 14px;
-  font-weight: 500;
-  color: #374151;
-  cursor: pointer;
-  transition: all 0.15s ease;
 }
 
-button.w-full.flex.items-center:hover,
-.dropdown-item:hover {
-  background: #f9fafb;
-  color: #111827;
-  transform: translateX(2px);
+.topbar input[type="text"]:hover {
+  border-color: var(--color-border-dark);
 }
 
-button.w-full.flex.items-center:active,
-.dropdown-item:active {
-  transform: translateX(0) scale(0.98);
+.topbar input[type="text"]:focus {
+  background: #fff;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
 }
 
-/* Logout Button in Dropdown */
-button.text-red-600 {
-  color: #dc2626;
+.topbar input[type="text"]::placeholder {
+  color: var(--color-text-tertiary);
 }
 
-button.text-red-600:hover {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-/* Mobile Menu Button */
-button[class*="lg:hidden"] {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: transparent;
-  border: 2px solid transparent;
-  color: #6b7280;
-  transition: all 0.2s ease;
-}
-
-button[class*="lg:hidden"]:hover {
-  background: #f3f4f6;
-  border-color: #e5e7eb;
-  color: #111827;
-}
-
-button[class*="lg:hidden"]:active {
-  transform: scale(0.95);
-}
-
-/* Backdrop Overlay */
-.fixed.inset-0.z-10 {
-  animation: fade-in 0.2s ease;
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* Responsive Adjustments */
-@media (max-width: 768px) {
-  input[type="text"],
-  input[placeholder*="Search"] {
-    font-size: 16px; /* Prevents zoom on iOS */
-    padding-left: 40px;
-  }
-
-  .user-info {
-    display: none !important;
-  }
-
-  .user-menu {
-    padding: 6px;
-  }
-
-  kbd {
-    display: none !important;
-  }
-}
-
-/* Focus Visible for Accessibility */
-button:focus-visible,
-input:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
+/* Notification badge */
+.notif-badge {
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 8px; height: 8px;
+  background: var(--color-error);
+  border-radius: 50%;
+  border: 2px solid #fff;
 }

@@ -1,7 +1,8 @@
-// src/pages/Incidents.jsx - UPDATED WITH FORM INTEGRATION
+// src/pages/Incidents.jsx
 import React, { useState, useEffect } from 'react';
 import StatCard from '../components/layout/common/StatCard';
 import IncidentFormModal from '../components/incidents/IncidentFormModal';
+import IncidentViewModal from '../components/incidents/IncidentViewModal';
 import {
   AlertCircle,
   Scale,
@@ -14,7 +15,6 @@ import {
   Plus,
   FileText,
   List,
-  ShieldAlert,
   Lock,
   Volume2,
   Home,
@@ -42,64 +42,55 @@ const Incidents = () => {
     clearError
   } = useIncidents();
 
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeFilter, setActiveFilter]       = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('All categories');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showFormModal, setShowFormModal] = useState(false);
+  const [searchQuery, setSearchQuery]         = useState('');
+  const [showFormModal, setShowFormModal]     = useState(false);
   const [editingIncident, setEditingIncident] = useState(null);
+  const [showViewModal, setShowViewModal]     = useState(false);
+  const [viewingIncident, setViewingIncident] = useState(null);
 
-  // Load incidents and stats on mount
   useEffect(() => {
     loadIncidents(50, true);
     loadStatistics();
   }, []);
 
   const filterButtons = [
-    { id: 'all', label: 'All Cases', icon: List },
-    { id: 'Open', label: 'Open', icon: FileText },
-    { id: 'Under Mediation', label: 'Mediation', icon: Scale },
-    { id: 'Resolved', label: 'Resolved', icon: CheckCircle }
+    { id: 'all',              label: 'All Cases',  icon: List        },
+    { id: 'Open',             label: 'Open',       icon: FileText    },
+    { id: 'Under Mediation',  label: 'Mediation',  icon: Scale       },
+    { id: 'Resolved',         label: 'Resolved',   icon: CheckCircle },
   ];
 
-  // Handle filter change
   const handleFilterChange = async (filterId) => {
     setActiveFilter(filterId);
-    
-    if (filterId === 'all') {
-      await loadIncidents(50, true);
-    } else {
-      await loadByStatus(filterId);
-    }
+    if (filterId === 'all') await loadIncidents(50, true);
+    else await loadByStatus(filterId);
   };
 
-  // Handle search
   const handleSearch = async (e) => {
     const value = e.target.value;
     setSearchQuery(value);
-
     if (value.trim() === '') {
       await loadIncidents(50, true);
     } else {
-      // Debounce search
       clearTimeout(window.searchTimeout);
       window.searchTimeout = setTimeout(async () => {
         await search(value, {
-          status: activeFilter !== 'all' ? activeFilter : undefined,
-          category: selectedCategory !== 'All categories' ? selectedCategory : undefined
+          status:   activeFilter !== 'all'            ? activeFilter      : undefined,
+          category: selectedCategory !== 'All categories' ? selectedCategory : undefined,
         });
       }, 500);
     }
   };
 
-  // Handle category change
   const handleCategoryChange = async (e) => {
     const category = e.target.value;
     setSelectedCategory(category);
-
     if (searchQuery.trim() !== '') {
       await search(searchQuery, {
-        status: activeFilter !== 'all' ? activeFilter : undefined,
-        category: category !== 'All categories' ? category : undefined
+        status:   activeFilter !== 'all'      ? activeFilter : undefined,
+        category: category !== 'All categories' ? category   : undefined,
       });
     } else if (activeFilter !== 'all') {
       await loadByStatus(activeFilter);
@@ -108,9 +99,9 @@ const Incidents = () => {
     }
   };
 
-  // Handle actions
   const handleView = (incident) => {
-    alert(`Viewing Case: ${incident.caseNumber}\n\nComplainant: ${incident.complainant.name}\nCategory: ${incident.category}\nLocation: ${incident.location}\nStatus: ${incident.status}`);
+    setViewingIncident(incident);
+    setShowViewModal(true);
   };
 
   const handleEdit = (incident) => {
@@ -141,22 +132,28 @@ const Incidents = () => {
     setEditingIncident(null);
   };
 
-  // Get category icon
+  const handleViewClose = () => {
+    setShowViewModal(false);
+    setViewingIncident(null);
+  };
+
+  const handleViewSuccess = () => {
+    loadIncidents(50, true);
+    loadStatistics();
+  };
+
   const getCategoryIcon = (categoryType) => {
     switch (categoryType) {
-      case 'dispute': return Scale;
-      case 'theft': return Lock;
-      case 'noise': return Volume2;
+      case 'dispute':  return Scale;
+      case 'theft':    return Lock;
+      case 'noise':    return Volume2;
       case 'property': return Home;
-      default: return AlertTriangle;
+      default:         return AlertTriangle;
     }
   };
 
-  // Format date
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
-    
-    // Handle Firestore Timestamp
     let date;
     if (timestamp.toDate && typeof timestamp.toDate === 'function') {
       date = timestamp.toDate();
@@ -165,29 +162,24 @@ const Incidents = () => {
     } else {
       date = new Date(timestamp);
     }
-    
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  // Get avatar background
   const getAvatarBg = (color) => {
     const colors = {
-      primary: '#3b82f6',
-      error: '#ef4444',
+      primary:   '#3b82f6',
+      error:     '#ef4444',
       secondary: '#8b5cf6',
-      warning: '#f59e0b',
-      success: '#10b981'
+      warning:   '#f59e0b',
+      success:   '#10b981',
     };
     return colors[color] || colors.primary;
   };
 
   return (
     <div className="page-container">
-      {/* Page Header */}
+
+      {/* Header */}
       <div className="page-header">
         <div className="page-header-content">
           <h1 className="page-title">Incident & Blotter Management</h1>
@@ -199,13 +191,9 @@ const Incidents = () => {
         </button>
       </div>
 
-      {/* Error Alert */}
+      {/* Error */}
       {error && (
-        <div className="card" style={{ 
-          background: 'var(--color-error-light)', 
-          border: '1px solid var(--color-error)', 
-          marginBottom: 'var(--space-6)' 
-        }}>
+        <div className="card" style={{ background: 'var(--color-error-light)', border: '1px solid var(--color-error)', marginBottom: 'var(--space-6)' }}>
           <div className="card-body">
             <div className="d-flex align-center justify-between">
               <div className="d-flex align-center gap-3">
@@ -215,48 +203,18 @@ const Incidents = () => {
                   <p className="text-secondary">{error}</p>
                 </div>
               </div>
-              <button className="btn-icon" onClick={clearError}>
-                <X size={20} />
-              </button>
+              <button className="btn-icon" onClick={clearError}><X size={20} /></button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Stats Grid */}
+      {/* Stats */}
       <div className="stats-grid">
-        <StatCard
-          title="Open Cases"
-          value={stats?.open?.toLocaleString() || '0'}
-          icon={AlertCircle}
-          iconBg="icon-bg-error"
-          badge="Requires attention"
-          badgeColor="badge-error"
-        />
-        <StatCard
-          title="Under Mediation"
-          value={stats?.underMediation?.toLocaleString() || '0'}
-          icon={Scale}
-          iconBg="icon-bg-primary"
-          badge="Lupon processing"
-          badgeColor="badge-primary"
-        />
-        <StatCard
-          title="Resolved (Month)"
-          value={stats?.resolved?.toLocaleString() || '0'}
-          icon={CheckCircle}
-          iconBg="icon-bg-success"
-          badge="↑ This month"
-          badgeColor="badge-success"
-        />
-        <StatCard
-          title="Total Cases"
-          value={stats?.total?.toLocaleString() || '0'}
-          icon={Timer}
-          iconBg="icon-bg-secondary"
-          badge="All time"
-          badgeColor="badge-gray"
-        />
+        <StatCard title="Open Cases"        value={stats?.open?.toLocaleString()          || '0'} icon={AlertCircle} iconBg="icon-bg-error"     badge="Requires attention" badgeColor="badge-error"   />
+        <StatCard title="Under Mediation"   value={stats?.underMediation?.toLocaleString() || '0'} icon={Scale}       iconBg="icon-bg-primary"   badge="Lupon processing"   badgeColor="badge-primary" />
+        <StatCard title="Resolved (Month)"  value={stats?.resolved?.toLocaleString()       || '0'} icon={CheckCircle} iconBg="icon-bg-success"   badge="↑ This month"       badgeColor="badge-success" />
+        <StatCard title="Total Cases"       value={stats?.total?.toLocaleString()          || '0'} icon={Timer}       iconBg="icon-bg-secondary" badge="All time"            badgeColor="badge-gray"    />
       </div>
 
       {/* Filters */}
@@ -265,12 +223,8 @@ const Incidents = () => {
           {filterButtons.map(btn => {
             const Icon = btn.icon;
             return (
-              <button
-                key={btn.id}
-                onClick={() => handleFilterChange(btn.id)}
-                disabled={loading}
-                className={`filter-btn ${activeFilter === btn.id ? 'active' : ''}`}
-              >
+              <button key={btn.id} onClick={() => handleFilterChange(btn.id)} disabled={loading}
+                className={`filter-btn ${activeFilter === btn.id ? 'active' : ''}`}>
                 <Icon size={18} strokeWidth={1.5} />
                 {btn.label}
               </button>
@@ -279,33 +233,13 @@ const Incidents = () => {
         </div>
         <div className="action-buttons-group">
           <div style={{ position: 'relative', minWidth: '200px' }}>
-            <Search
-              size={18}
-              style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--color-text-tertiary)'
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Search cases..."
-              value={searchQuery}
-              onChange={handleSearch}
-              disabled={loading}
-              className="form-input"
-              style={{ paddingLeft: '40px' }}
-            />
+            <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
+            <input type="text" placeholder="Search cases..." value={searchQuery}
+              onChange={handleSearch} disabled={loading}
+              className="form-input" style={{ paddingLeft: '40px' }} />
           </div>
-          <select
-            value={selectedCategory}
-            onChange={handleCategoryChange}
-            disabled={loading}
-            className="form-select"
-            style={{ minWidth: '150px' }}
-          >
+          <select value={selectedCategory} onChange={handleCategoryChange}
+            disabled={loading} className="form-select" style={{ minWidth: '150px' }}>
             <option>All categories</option>
             <option>Dispute</option>
             <option>Theft</option>
@@ -314,13 +248,12 @@ const Incidents = () => {
             <option>Others</option>
           </select>
           <button className="btn btn-secondary btn-md" disabled={loading}>
-            <Download size={18} strokeWidth={1.5} />
-            Export
+            <Download size={18} strokeWidth={1.5} /> Export
           </button>
         </div>
       </div>
 
-      {/* Data Table */}
+      {/* Table */}
       <div className="data-table-card">
         <div className="table-container">
           <table className="data-table">
@@ -337,63 +270,32 @@ const Incidents = () => {
             </thead>
             <tbody>
               {loading && incidents.length === 0 ? (
-                <tr>
-                  <td colSpan="7">
-                    <div className="empty-state">
-                      <Loader className="empty-state-icon animate-spin" />
-                      <h3 className="empty-state-title">Loading incidents...</h3>
-                      <p className="empty-state-description">Please wait</p>
-                    </div>
-                  </td>
-                </tr>
+                <tr><td colSpan="7">
+                  <div className="empty-state">
+                    <Loader className="empty-state-icon animate-spin" />
+                    <h3 className="empty-state-title">Loading incidents...</h3>
+                    <p className="empty-state-description">Please wait</p>
+                  </div>
+                </td></tr>
               ) : incidents.length > 0 ? (
                 incidents.map((incident) => {
                   const CategoryIcon = getCategoryIcon(incident.categoryType);
-                  
                   return (
                     <tr key={incident.id}>
                       <td>
-                        <span className="fw-semibold text-primary">
-                          {incident.caseNumber}
-                        </span>
+                        <span className="fw-semibold text-primary">{incident.caseNumber}</span>
                       </td>
                       <td>
                         <div className="d-flex align-center gap-2">
-                          <div
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: 'var(--radius-md)',
-                              background: 'var(--color-bg-tertiary)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'var(--color-text-secondary)'
-                            }}
-                          >
+                          <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: 'var(--color-bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>
                             <CategoryIcon size={16} />
                           </div>
-                          <span className="badge badge-gray">
-                            {incident.category}
-                          </span>
+                          <span className="badge badge-gray">{incident.category}</span>
                         </div>
                       </td>
                       <td>
                         <div className="user-info-cell">
-                          <div
-                            style={{
-                              width: '40px',
-                              height: '40px',
-                              borderRadius: 'var(--radius-full)',
-                              background: getAvatarBg(incident.complainant.color),
-                              color: 'white',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 600,
-                              fontSize: 'var(--font-size-sm)'
-                            }}
-                          >
+                          <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-full)', background: getAvatarBg(incident.complainant.color), color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
                             {incident.complainant.initial}
                           </div>
                           <div className="user-details">
@@ -405,9 +307,7 @@ const Incidents = () => {
                       <td>
                         <div className="d-flex align-center gap-1 text-secondary">
                           <MapPin size={14} />
-                          <span style={{ fontSize: 'var(--font-size-sm)' }}>
-                            {incident.location}
-                          </span>
+                          <span style={{ fontSize: 'var(--font-size-sm)' }}>{incident.location}</span>
                         </div>
                       </td>
                       <td className="text-secondary">{formatDate(incident.systemInfo?.dateFiled)}</td>
@@ -418,33 +318,16 @@ const Incidents = () => {
                       </td>
                       <td>
                         <div className="d-flex align-center gap-2">
-                          <button
-                            className="btn-icon btn-icon-sm"
-                            onClick={() => handleView(incident)}
-                            title="View Details"
-                          >
+                          <button className="btn-icon btn-icon-sm" onClick={() => handleView(incident)} title="View Details">
                             <Eye size={16} />
                           </button>
-                          <button
-                            className="btn-icon btn-icon-sm"
-                            onClick={() => handleEdit(incident)}
-                            title="Edit Incident"
-                          >
+                          <button className="btn-icon btn-icon-sm" onClick={() => handleEdit(incident)} title="Edit Incident">
                             <Edit size={16} />
                           </button>
-                          <button
-                            className="btn-icon btn-icon-sm"
-                            onClick={() => handleSendSummon(incident)}
-                            title="Send Summon"
-                            style={{ color: 'var(--color-secondary)' }}
-                          >
+                          <button className="btn-icon btn-icon-sm" onClick={() => handleSendSummon(incident)} title="Send Summon" style={{ color: 'var(--color-secondary)' }}>
                             <Send size={16} />
                           </button>
-                          <button
-                            className="btn-icon btn-icon-sm"
-                            onClick={() => handleMore(incident)}
-                            title="More Options"
-                          >
+                          <button className="btn-icon btn-icon-sm" onClick={() => handleMore(incident)} title="More Options">
                             <MoreVertical size={16} />
                           </button>
                         </div>
@@ -453,23 +336,20 @@ const Incidents = () => {
                   );
                 })
               ) : (
-                <tr>
-                  <td colSpan="7">
-                    <div className="empty-state">
-                      <AlertCircle className="empty-state-icon" />
-                      <h3 className="empty-state-title">No incidents found</h3>
-                      <p className="empty-state-description">
-                        {searchQuery ? 'Try adjusting your search criteria' : 'Click "New Incident Report" to get started'}
-                      </p>
-                    </div>
-                  </td>
-                </tr>
+                <tr><td colSpan="7">
+                  <div className="empty-state">
+                    <AlertCircle className="empty-state-icon" />
+                    <h3 className="empty-state-title">No incidents found</h3>
+                    <p className="empty-state-description">
+                      {searchQuery ? 'Try adjusting your search criteria' : 'Click "New Incident Report" to get started'}
+                    </p>
+                  </div>
+                </td></tr>
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination */}
         {incidents.length > 0 && (
           <div className="pagination-container">
             <p className="pagination-info">
@@ -477,32 +357,30 @@ const Incidents = () => {
               {stats?.total ? ` of ${stats.total} total` : ''}
             </p>
             {hasMore && (
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={loadMore}
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader size={16} className="animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  'Load More'
-                )}
+              <button className="btn btn-secondary btn-sm" onClick={loadMore} disabled={loading}>
+                {loading ? <><Loader size={16} className="animate-spin" />Loading...</> : 'Load More'}
               </button>
             )}
           </div>
         )}
       </div>
 
-      {/* Incident Form Modal */}
+      {/* ── Modals ── */}
       <IncidentFormModal
         isOpen={showFormModal}
         onClose={handleFormClose}
         incident={editingIncident}
         onSuccess={handleFormSuccess}
       />
+
+      <IncidentViewModal
+        isOpen={showViewModal}
+        onClose={handleViewClose}
+        incident={viewingIncident}
+        onEdit={(inc) => { handleViewClose(); handleEdit(inc); }}
+        onSuccess={handleViewSuccess}
+      />
+
     </div>
   );
 };

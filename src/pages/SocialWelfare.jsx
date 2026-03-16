@@ -16,11 +16,48 @@ import {
   Search,
   Filter,
   Calendar,
-  MoreVertical
+  MoreVertical,
+  MessageSquare,
+  Trash2,
+  Save
 } from 'lucide-react';
 import { useWelfare } from '../hooks/useWelfare';
+import { submitGrievance, getAllGrievances, updateGrievanceStatus, deleteGrievance } from '../services/grievanceService';
 
 const SocialWelfare = () => {
+  // ── Grievance state ──
+  const [grievances, setGrievances]             = useState([]);
+  const [grievanceLoading, setGrievanceLoading] = useState(false);
+  const [showGrievanceModal, setShowGrievanceModal] = useState(false);
+  const [showResolveModal,   setShowResolveModal]   = useState(false);
+  const [selectedGrievance,  setSelectedGrievance]  = useState(null);
+  const [resolution, setResolution] = useState('');
+  const [grievanceForm, setGrievanceForm] = useState({ fullName: '', purok: '', contactNumber: '', category: 'Aid Distribution', programName: '', description: '' });
+  const [grievanceSaving, setGrievanceSaving] = useState(false);
+  const [grievanceErr, setGrievanceErr] = useState('');
+
+  const loadGrievances = async () => {
+    setGrievanceLoading(true);
+    try { const r = await getAllGrievances(); if (r.success) setGrievances(r.data); }
+    catch (_) {} finally { setGrievanceLoading(false); }
+  };
+
+  const handleGrievanceSave = async () => {
+    if (!grievanceForm.fullName.trim() || !grievanceForm.description.trim()) { setGrievanceErr('Name and description required.'); return; }
+    setGrievanceSaving(true);
+    const r = await submitGrievance(grievanceForm, null);
+    setGrievanceSaving(false);
+    if (r.success) { setShowGrievanceModal(false); setGrievanceForm({ fullName: '', purok: '', contactNumber: '', category: 'Aid Distribution', programName: '', description: '' }); loadGrievances(); }
+    else setGrievanceErr(r.error);
+  };
+
+  const handleResolve = async (status) => {
+    if (!selectedGrievance) return;
+    await updateGrievanceStatus(selectedGrievance.id, status, resolution, null);
+    setShowResolveModal(false);
+    setResolution('');
+    loadGrievances();
+  };
   const {
     programs,
     beneficiaries,
@@ -84,6 +121,7 @@ const SocialWelfare = () => {
     loadBeneficiaries();
     loadDistributions();
     loadStatistics();
+    loadGrievances();
   }, []);
 
   // Handle program form change
@@ -329,6 +367,13 @@ const SocialWelfare = () => {
           >
             <DollarSign size={18} />
             Distributions
+          </button>
+          <button
+            onClick={() => setActiveTab('grievances')}
+            className={`filter-btn ${activeTab === 'grievances' ? 'active' : ''}`}
+          >
+            <MessageSquare size={18} />
+            Grievances
           </button>
         </div>
 
@@ -991,6 +1036,147 @@ const SocialWelfare = () => {
           </div>
         </div>
       )}
+
+      {/* ── GRIEVANCES TAB ── */}
+      {activeTab === 'grievances' && (
+        <div className="card">
+          <div className="card-header">
+            <h3 className="table-title">Grievances & Appeals</h3>
+            <button className="btn btn-primary btn-sm" onClick={() => { setGrievanceErr(''); setShowGrievanceModal(true); }}>
+              <Plus size={15} /> Submit Grievance
+            </button>
+          </div>
+          <div className="card-body">
+            {grievanceLoading ? <p className="text-secondary">Loading...</p> : grievances.length === 0 ? (
+              <div className="empty-state">
+                <MessageSquare className="empty-state-icon" />
+                <h3 className="empty-state-title">No grievances filed</h3>
+                <p className="empty-state-description">Residents can submit complaints or appeals about aid distribution</p>
+                <button className="btn btn-primary btn-md mt-4" onClick={() => { setGrievanceErr(''); setShowGrievanceModal(true); }}><Plus size={16} /> Submit First Grievance</button>
+              </div>
+            ) : (
+              <div className="d-flex flex-column gap-3">
+                {grievances.map(g => (
+                  <div key={g.id} className={`list-card list-card-${g.status === 'Pending' ? 'warning' : g.status === 'Resolved' ? 'success' : 'primary'}`}>
+                    <div className="list-card-content">
+                      <div className="list-card-body">
+                        <div className="list-card-header">
+                          <span className={`badge badge-${g.status === 'Pending' ? 'warning' : g.status === 'Resolved' ? 'success' : 'primary'}`}>{g.status}</span>
+                          <span className="badge badge-gray">{g.category}</span>
+                        </div>
+                        <h4 className="list-card-title">{g.fullName}</h4>
+                        <p className="list-card-description">{g.description}</p>
+                        <div className="list-card-meta">
+                          {g.purok && <span className="list-card-meta-item">{g.purok}</span>}
+                          {g.programName && <span className="list-card-meta-item">Program: {g.programName}</span>}
+                          {g.contactNumber && <span className="list-card-meta-item">{g.contactNumber}</span>}
+                        </div>
+                        {g.resolution && <p className="text-secondary mt-2" style={{ fontSize: 'var(--font-size-sm)' }}>Resolution: {g.resolution}</p>}
+                      </div>
+                      <div className="list-card-actions">
+                        {g.status === 'Pending' && (
+                          <button className="btn btn-secondary btn-sm" onClick={() => { setSelectedGrievance(g); setResolution(''); setShowResolveModal(true); }}>
+                            Review
+                          </button>
+                        )}
+                        <button className="btn-icon" style={{ color: 'var(--color-error)' }} onClick={() => { if (window.confirm('Delete?')) { deleteGrievance(g.id); loadGrievances(); } }}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── GRIEVANCE SUBMIT MODAL ── */}
+      {showGrievanceModal && (
+        <div className="modal-overlay" onClick={() => setShowGrievanceModal(false)}>
+          <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Submit Grievance / Appeal</h2>
+              <button className="btn-icon" onClick={() => setShowGrievanceModal(false)}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              {grievanceErr && <div className="alert alert-error mb-3">{grievanceErr}</div>}
+              <div className="form-group">
+                <label className="form-label">Full Name *</label>
+                <input className="form-input" value={grievanceForm.fullName} onChange={e => setGrievanceForm(p => ({ ...p, fullName: e.target.value }))} placeholder="Resident's full name" />
+              </div>
+              <div className="grid-2" style={{ gap: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">Purok</label>
+                  <input className="form-input" value={grievanceForm.purok} onChange={e => setGrievanceForm(p => ({ ...p, purok: e.target.value }))} placeholder="e.g. Purok 3" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Contact Number</label>
+                  <input className="form-input" value={grievanceForm.contactNumber} onChange={e => setGrievanceForm(p => ({ ...p, contactNumber: e.target.value }))} placeholder="09xxxxxxxxx" />
+                </div>
+              </div>
+              <div className="grid-2" style={{ gap: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">Category</label>
+                  <select className="form-select" value={grievanceForm.category} onChange={e => setGrievanceForm(p => ({ ...p, category: e.target.value }))}>
+                    <option>Aid Distribution</option>
+                    <option>Eligibility</option>
+                    <option>Program Complaint</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Related Program</label>
+                  <input className="form-input" value={grievanceForm.programName} onChange={e => setGrievanceForm(p => ({ ...p, programName: e.target.value }))} placeholder="Optional" />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Description *</label>
+                <textarea className="form-input" rows={4} value={grievanceForm.description} onChange={e => setGrievanceForm(p => ({ ...p, description: e.target.value }))} placeholder="Describe your complaint or appeal..." />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-md" onClick={() => setShowGrievanceModal(false)} disabled={grievanceSaving}>Cancel</button>
+              <button className="btn btn-primary btn-md" onClick={handleGrievanceSave} disabled={grievanceSaving}>
+                <Save size={16} />{grievanceSaving ? 'Submitting...' : 'Submit Grievance'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── RESOLVE MODAL ── */}
+      {showResolveModal && selectedGrievance && (
+        <div className="modal-overlay" onClick={() => setShowResolveModal(false)}>
+          <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Review Grievance</h2>
+              <button className="btn-icon" onClick={() => setShowResolveModal(false)}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <div className="card mb-3" style={{ background: 'var(--color-bg-secondary)' }}>
+                <div className="card-body">
+                  <p className="fw-semibold text-primary mb-1">{selectedGrievance.fullName}</p>
+                  <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>{selectedGrievance.description}</p>
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Resolution Notes</label>
+                <textarea className="form-input" rows={3} value={resolution} onChange={e => setResolution(e.target.value)} placeholder="Explain how this was resolved or why it was dismissed..." />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary btn-md" onClick={() => setShowResolveModal(false)}>Cancel</button>
+              <button className="btn btn-ghost btn-md" onClick={() => handleResolve('Dismissed')}>Dismiss</button>
+              <button className="btn btn-primary btn-md" onClick={() => handleResolve('Resolved')}>
+                <Check size={16} /> Mark Resolved
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
