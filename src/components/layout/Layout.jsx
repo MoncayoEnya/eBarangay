@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -19,18 +19,39 @@ import {
   Bell,
   Search,
   HelpCircle,
-  ChevronDown
+  ChevronDown,
+  Menu,
+  X as XIcon
 } from 'lucide-react';
 
 import '../../styles/Layout.css';
 import logoImage from '../../assets/images/barangay_logo.jpg';
+import BarangayChat from '../chat/BarangayChat';
+import { useBarangayConfig } from '../../hooks/useBarangayConfig';
 
 export default function Layout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
+  const { barangayName } = useBarangayConfig();
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  // Prevent body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileOpen]);
 
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -71,9 +92,17 @@ export default function Layout({ children }) {
 
   return (
     <div className="layout-wrapper">
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="sidebar-overlay visible"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
       {/* Sidebar with Auto-Expand on Hover */}
       <aside
-        className={`modern-sidebar ${sidebarExpanded ? 'expanded' : 'collapsed'}`}
+        className={`modern-sidebar ${sidebarExpanded ? 'expanded' : 'collapsed'} ${mobileOpen ? 'mobile-open' : ''}`}
         onMouseEnter={() => setSidebarExpanded(true)}
         onMouseLeave={() => setSidebarExpanded(false)}
       >
@@ -88,6 +117,28 @@ export default function Layout({ children }) {
               <p>Management System</p>
             </div>
           )}
+          {/* Mobile close button */}
+          <button
+            className="mobile-sidebar-close"
+            onClick={() => setMobileOpen(false)}
+            title="Close menu"
+            aria-label="Close navigation menu"
+            style={{
+              marginLeft: 'auto',
+              display: 'none',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 30, height: 30,
+              borderRadius: 8,
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              color: '#94A3B8',
+              transition: 'background 0.15s',
+            }}
+          >
+            <XIcon size={18} />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -141,6 +192,16 @@ export default function Layout({ children }) {
         {/* Modern Topbar */}
         <header className="modern-topbar">
           <div className="topbar-left">
+            {/* Mobile menu button */}
+            <button
+              className="mobile-menu-btn"
+              onClick={() => setMobileOpen(true)}
+              title="Open menu"
+              aria-label="Open navigation menu"
+            >
+              <Menu size={20} />
+            </button>
+
             {/* Clean Modern Search */}
             <div className="search-box">
               <Search className="search-icon" size={20} />
@@ -230,6 +291,9 @@ export default function Layout({ children }) {
         {/* Page Content */}
         <main className="page-content">{children}</main>
       </div>
+
+      {/* AI Chatbot — floating on every page */}
+      <BarangayChat barangayName={barangayName} />
     </div>
   );
 }

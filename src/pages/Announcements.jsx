@@ -13,14 +13,30 @@ import {
   collection, addDoc, getDocs, updateDoc, doc,
   serverTimestamp, query, orderBy
 } from 'firebase/firestore';
+import { sendSMS } from '../services/smsService';
+import { useBarangayConfig } from '../hooks/useBarangayConfig';
 
 const TYPES   = ['GENERAL', 'IMPORTANT', 'URGENT', 'INFO'];
+const TARGET_GROUPS = [
+  'All Residents',
+  'Senior Citizens',
+  'PWDs (Persons with Disability)',
+  '4Ps Beneficiaries',
+  'Purok 1', 'Purok 2', 'Purok 3', 'Purok 4', 'Purok 5',
+  'Purok 6', 'Purok 7', 'Purok 8',
+  'Barangay Officials',
+  'Health Workers',
+  'Voters',
+  'Youth / Students',
+];
 const emptyForm = { title: '', description: '', type: 'GENERAL', author: '', targetGroup: 'All Residents' };
 
 const Announcements = () => {
   const { announcements, loading, error, stats, loadAnnouncements, create, update, remove, loadStats } = useAnnouncements();
 
-  const [activeSection, setActiveSection] = useState('announcements'); // 'announcements' | 'feedback'
+  const { sitiosWithAll } = useBarangayConfig();
+  const [smsSending, setSmsSending]       = useState(false);
+  const [activeSection, setActiveSection] = useState('announcements');
   const [activeFilter, setActiveFilter]   = useState('all');
   const [searchQuery, setSearchQuery]     = useState('');
   const [showModal, setShowModal]         = useState(false);
@@ -111,8 +127,36 @@ const Announcements = () => {
     const payload = { ...form, typeClass: form.type.toLowerCase() };
     const result = editingItem ? await update(editingItem.id, payload) : await create(payload);
     setSaving(false);
-    if (result.success) { closeModal(); loadStats(); }
-    else setFormError(result.error || 'Something went wrong.');
+    if (result.success) {
+      closeModal();
+      loadStats();
+      // Send SMS for URGENT announcements — filtered by targetGroup/purok
+      if (form.type === 'URGENT' && !editingItem) {
+        setSmsSending(true);
+        try {
+          const snap = await getDocs(query(collection(db, 'residents'), orderBy('systemInfo.createdAt', 'desc')));
+          const allResidents = snap.docs.map(d => d.data());
+          const targetGroup  = form.targetGroup || 'All Residents';
+
+          // Filter by purok if a specific group is selected
+          const filtered = targetGroup === 'All Residents'
+            ? allResidents
+            : allResidents.filter(r => {
+                const rPurok = (r.address?.purok || r.purok || '').toLowerCase();
+                return rPurok === targetGroup.toLowerCase();
+              });
+
+          const numbers = filtered
+            .map(r => r.contactNumber || r.emergencyContact?.number)
+            .filter(n => n && /^(09|\+639)\d{9}$/.test(String(n).replace(/\s|-/g, '')));
+
+          if (numbers.length > 0) {
+            await sendSMS([...new Set(numbers)], `[URGENT - ${targetGroup}] ${form.title}: ${form.description.slice(0, 120)}`);
+          }
+        } catch (_) {}
+        setSmsSending(false);
+      }
+    } else setFormError(result.error || 'Something went wrong.');
   };
 
   const handleDelete = async (item) => {
@@ -357,44 +401,198 @@ const Announcements = () => {
         </div>
       )}
 
-      {/* Announcement Modal */}
+      {/* ═══════════════════════════════════════════
+           ANNOUNCEMENT MODAL — Full UI Design
+      ═══════════════════════════════════════════ */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
-            <div className="modal-header">
-              <h2 className="modal-title">{editingItem ? 'Edit Announcement' : 'Create Announcement'}</h2>
-              <button className="btn-icon" onClick={closeModal}><X size={20} /></button>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff',
+              borderRadius: 22,
+              width: '100%',
+              maxWidth: 580,
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 24px 64px rgba(15,23,42,0.18), 0 0 0 1.5px rgba(240,244,248,1)',
+              overflow: 'hidden',
+              animation: 'slideInUp 0.22s cubic-bezier(0.34,1.15,0.64,1)',
+            }}
+          >
+            {/* ── Coloured Header Band ── */}
+            <div style={{
+              background: editingItem
+                ? 'linear-gradient(135deg, #1D4ED8 0%, #3B82F6 100%)'
+                : form.type === 'URGENT'   ? 'linear-gradient(135deg, #991B1B 0%, #EF4444 100%)'
+                : form.type === 'IMPORTANT'? 'linear-gradient(135deg, #92400E 0%, #F59E0B 100%)'
+                : form.type === 'INFO'     ? 'linear-gradient(135deg, #065F46 0%, #10B981 100%)'
+                : 'linear-gradient(135deg, #1D4ED8 0%, #3B82F6 100%)',
+              padding: '22px 26px 20px',
+              flexShrink: 0,
+              position: 'relative',
+              overflow: 'hidden',
+            }}>
+              {/* Decorative circle */}
+              <div style={{ position:'absolute', right:-30, top:-30, width:120, height:120, borderRadius:'50%', background:'rgba(255,255,255,0.07)', pointerEvents:'none' }} />
+              <div style={{ position:'absolute', right:40, bottom:-40, width:80, height:80, borderRadius:'50%', background:'rgba(255,255,255,0.05)', pointerEvents:'none' }} />
+
+              <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', position:'relative' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:13 }}>
+                  <div style={{ width:44, height:44, borderRadius:13, background:'rgba(255,255,255,0.18)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, backdropFilter:'blur(4px)' }}>
+                    <Megaphone size={22} color="#fff" />
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize:18, fontWeight:800, color:'#fff', margin:0, letterSpacing:'-0.025em' }}>
+                      {editingItem ? 'Edit Announcement' : 'Create Announcement'}
+                    </h2>
+                    <p style={{ fontSize:12.5, color:'rgba(255,255,255,0.72)', margin:'3px 0 0', fontWeight:400 }}>
+                      {editingItem ? 'Update this announcement for residents' : 'Publish a new barangay announcement'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={closeModal}
+                  style={{ width:32, height:32, borderRadius:9, background:'rgba(255,255,255,0.15)', border:'none', cursor:'pointer', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', transition:'background 0.15s', flexShrink:0 }}
+                  onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.25)'}
+                  onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.15)'}
+                >
+                  <X size={17} />
+                </button>
+              </div>
+
+              {/* Type quick-select pills inside header */}
+              <div style={{ display:'flex', gap:6, marginTop:16, flexWrap:'wrap' }}>
+                {TYPES.map(t => {
+                  const active = form.type === t;
+                  const pill = {
+                    GENERAL:   { bg: active ? '#fff'           : 'rgba(255,255,255,0.12)', color: active ? '#1D4ED8' : 'rgba(255,255,255,0.85)' },
+                    IMPORTANT: { bg: active ? '#FEF3C7'        : 'rgba(255,255,255,0.12)', color: active ? '#92400E' : 'rgba(255,255,255,0.85)' },
+                    URGENT:    { bg: active ? '#FEE2E2'        : 'rgba(255,255,255,0.12)', color: active ? '#991B1B' : 'rgba(255,255,255,0.85)' },
+                    INFO:      { bg: active ? '#D1FAE5'        : 'rgba(255,255,255,0.12)', color: active ? '#065F46' : 'rgba(255,255,255,0.85)' },
+                  }[t];
+                  return (
+                    <button key={t} type="button"
+                      onClick={() => setForm(p => ({ ...p, type: t }))}
+                      style={{ padding:'5px 13px', borderRadius:100, fontSize:11.5, fontWeight:700, border:'none', cursor:'pointer', background:pill.bg, color:pill.color, letterSpacing:'0.05em', transition:'all 0.15s', boxShadow: active ? '0 2px 8px rgba(0,0,0,0.15)' : 'none' }}>
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="modal-body">
-              {formError && <div className="alert alert-error mb-3">{formError}</div>}
+
+            {/* ── Body ── */}
+            <div style={{ flex:1, overflowY:'auto', padding:'24px 26px', display:'flex', flexDirection:'column', gap:18 }}>
+              {formError && (
+                <div style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 15px', background:'#FEF2F2', border:'1.5px solid #FECACA', borderRadius:11, fontSize:13, color:'#DC2626', fontWeight:500 }}>
+                  <AlertCircle size={15} />
+                  {formError}
+                </div>
+              )}
+
+              {/* Title */}
               <div className="form-group">
-                <label className="form-label">Title *</label>
-                <input className="form-input" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="Announcement title" />
+                <label className="form-label">Title <span style={{color:'#EF4444'}}>*</span></label>
+                <input
+                  className="form-input"
+                  value={form.title}
+                  onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder="e.g. Community Clean-up Drive on Saturday"
+                  style={{ fontSize:15, fontWeight:500 }}
+                />
               </div>
+
+              {/* Target Group + Author — 2 col */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                <div className="form-group">
+                  <label className="form-label">Target Group</label>
+                  <select className="form-select" value={form.targetGroup}
+                    onChange={e => setForm(p => ({ ...p, targetGroup: e.target.value }))}>
+                    {[...TARGET_GROUPS,
+                      ...(sitiosWithAll || []).filter(s => s !== 'All Puroks' && !TARGET_GROUPS.includes(s)).map(s => `Purok/Sitio: ${s}`)
+                    ].map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Author / Posted By</label>
+                  <input className="form-input" value={form.author}
+                    onChange={e => setForm(p => ({ ...p, author: e.target.value }))}
+                    placeholder="e.g. Barangay Captain" />
+                </div>
+              </div>
+
+              {/* URGENT SMS notice */}
+              {form.type === 'URGENT' && (
+                <div style={{ display:'flex', alignItems:'flex-start', gap:11, padding:'12px 15px', background:'#FEF2F2', border:'1.5px solid #FECACA', borderRadius:12 }}>
+                  <Bell size={15} color="#DC2626" style={{ flexShrink:0, marginTop:1 }} />
+                  <p style={{ fontSize:12.5, color:'#991B1B', margin:0, lineHeight:1.55, fontWeight:500 }}>
+                    <strong>URGENT</strong> announcements will trigger an SMS blast to all residents with registered phone numbers (if SMS gateway is enabled in Settings).
+                  </p>
+                </div>
+              )}
+
+              {/* Description */}
               <div className="form-group">
-                <label className="form-label">Type *</label>
-                <select className="form-select" value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}>
-                  {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <label className="form-label">
+                  Description <span style={{color:'#EF4444'}}>*</span>
+                  <span style={{ fontSize:11, color:'#94A3B8', fontWeight:400, marginLeft:8 }}>
+                    {form.description.length}/500
+                  </span>
+                </label>
+                <textarea
+                  className="form-textarea"
+                  rows={5}
+                  maxLength={500}
+                  value={form.description}
+                  onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                  placeholder="Write the full announcement here. Be clear and specific for residents to understand..."
+                  style={{ resize:'vertical', lineHeight:1.65 }}
+                />
               </div>
-              <div className="form-group">
-                <label className="form-label">Target Group</label>
-                <input className="form-input" value={form.targetGroup} onChange={e => setForm(p => ({ ...p, targetGroup: e.target.value }))} placeholder="e.g. All Residents, Senior Citizens, Purok 1" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Author</label>
-                <input className="form-input" value={form.author} onChange={e => setForm(p => ({ ...p, author: e.target.value }))} placeholder="e.g. Barangay Captain" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Description *</label>
-                <textarea className="form-input" rows={5} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Announcement details..." />
-              </div>
+
+              {/* Preview chip */}
+              {form.title && (
+                <div style={{ background:'#F8FAFC', border:'1.5px solid #F0F4F8', borderRadius:14, padding:'14px 16px' }}>
+                  <p style={{ fontSize:10.5, fontWeight:700, color:'#94A3B8', textTransform:'uppercase', letterSpacing:'.08em', margin:'0 0 8px' }}>Preview</p>
+                  <div style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
+                    <div style={{ width:40, height:40, borderRadius:11, background: form.type==='URGENT'?'#FEE2E2':form.type==='IMPORTANT'?'#FEF3C7':form.type==='INFO'?'#D1FAE5':'#DBEAFE', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <Megaphone size={18} color={form.type==='URGENT'?'#DC2626':form.type==='IMPORTANT'?'#D97706':form.type==='INFO'?'#059669':'#2563EB'} />
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                        <span style={{ fontSize:11, fontWeight:700, padding:'2px 9px', borderRadius:100, background:form.type==='URGENT'?'#FEE2E2':form.type==='IMPORTANT'?'#FEF3C7':form.type==='INFO'?'#D1FAE5':'#DBEAFE', color:form.type==='URGENT'?'#991B1B':form.type==='IMPORTANT'?'#92400E':form.type==='INFO'?'#065F46':'#1E40AF' }}>
+                          {form.type}
+                        </span>
+                        {form.targetGroup && <span style={{ fontSize:11, color:'#94A3B8' }}>→ {form.targetGroup}</span>}
+                      </div>
+                      <p style={{ fontSize:14, fontWeight:600, color:'#0F172A', margin:'0 0 3px' }}>{form.title}</p>
+                      {form.description && <p style={{ fontSize:12.5, color:'#64748B', margin:0, lineHeight:1.5, overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>{form.description}</p>}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary btn-md" onClick={closeModal} disabled={saving}>Cancel</button>
-              <button className="btn btn-primary btn-md" onClick={handleSave} disabled={saving}>
-                <Save size={16} />{saving ? 'Saving...' : editingItem ? 'Update' : 'Publish'}
-              </button>
+
+            {/* ── Footer ── */}
+            <div style={{ padding:'16px 26px', borderTop:'1.5px solid #F0F4F8', display:'flex', alignItems:'center', justifyContent:'space-between', background:'#FAFBFE', flexShrink:0, gap:10 }}>
+              <div style={{ fontSize:12, color:'#94A3B8', fontWeight:500 }}>
+                {editingItem ? 'Changes will be visible to all residents.' : 'Will be visible to residents immediately.'}
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button className="btn btn-secondary btn-md" onClick={closeModal} disabled={saving}>Cancel</button>
+                <button
+                  className="btn btn-primary btn-md"
+                  onClick={handleSave}
+                  disabled={saving || smsSending}
+                  style={{ minWidth:120, background: form.type==='URGENT' ? 'linear-gradient(135deg,#DC2626,#EF4444)' : form.type==='IMPORTANT' ? 'linear-gradient(135deg,#D97706,#F59E0B)' : 'linear-gradient(135deg,#2563EB,#3B82F6)' }}
+                >
+                  {saving ? <><Loader size={15} className="animate-spin" />Saving...</>
+                  : smsSending ? <><Loader size={15} className="animate-spin" />Sending SMS…</>
+                  : <><Send size={15} />{editingItem ? 'Update' : 'Publish'}</>}
+                </button>
+              </div>
             </div>
           </div>
         </div>

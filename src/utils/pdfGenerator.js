@@ -34,7 +34,7 @@ export const generateDocumentPDF = async (doc) => {
   // Barangay name — pull from localStorage if set via Settings, else default
   const brgyName   = localStorage.getItem('brgy_name')   || 'BARANGAY MANAGEMENT SYSTEM';
   const brgyMunicipality = localStorage.getItem('brgy_municipality') || 'Municipality, Province';
-  const captainName = localStorage.getItem('brgy_captain') || 'HON. BARANGAY CAPTAIN';
+  const captainName = doc.document?.signatory || localStorage.getItem('brgy_captain') || 'HON. BARANGAY CAPTAIN';
 
   const html = `<!DOCTYPE html>
 <html>

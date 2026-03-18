@@ -9,11 +9,12 @@ import {
   XCircle, ChevronRight, ClipboardList, Hash, User, Calendar
 } from 'lucide-react';
 import { useDocuments } from '../hooks/useDocuments';
+import { sendDocumentReadySMS } from '../services/smsService';
 
 const Documents = () => {
   const {
     documents, loading, error, stats,
-    loadDocuments, search, approve, deny,
+    loadDocuments, search, approve, deny, release,
     loadStatistics, clearError
   } = useDocuments();
 
@@ -27,6 +28,8 @@ const Documents = () => {
   const [showDenyModal, setShowDenyModal]   = useState(false);
   const [controlNumber, setControlNumber]   = useState('');
   const [denialReason, setDenialReason]     = useState('');
+  const [officialSignatory, setOfficialSignatory] = useState('');
+  const [showReleaseModal, setShowReleaseModal] = useState(false);
   const [actionLoading, setActionLoading]   = useState(false);
 
   useEffect(() => {
@@ -59,10 +62,28 @@ const Documents = () => {
   const handleApproveConfirm = async () => {
     if (!controlNumber.trim()) { alert('Please enter a control number'); return; }
     setActionLoading(true);
-    const result = await approve(selectedDoc.id, controlNumber, 12);
+    const result = await approve(selectedDoc.id, controlNumber, officialSignatory, 12);
     setActionLoading(false);
     if (result.success) {
-      setShowApproveModal(false); setSelectedDoc(null); setControlNumber('');
+      setShowApproveModal(false); setSelectedDoc(null); setControlNumber(''); setOfficialSignatory('');
+      loadStatistics();
+    } else alert('Error: ' + result.error);
+  };
+
+  const handleReleaseConfirm = async () => {
+    setActionLoading(true);
+    const result = await release(selectedDoc.id, '');
+    setActionLoading(false);
+    if (result.success) {
+      // Send SMS notification
+      if (selectedDoc?.requester?.contactNumber) {
+        await sendDocumentReadySMS(
+          selectedDoc.requester.contactNumber,
+          selectedDoc.documentType,
+          selectedDoc.document?.controlNumber || selectedDoc.requestId
+        );
+      }
+      setShowReleaseModal(false); setSelectedDoc(null);
       loadStatistics();
     } else alert('Error: ' + result.error);
   };
@@ -271,6 +292,12 @@ const Documents = () => {
                               <button className="btn-icon btn-icon-sm" title="Print" style={{ color: '#8b5cf6' }} onClick={() => handlePrint(doc)}><Printer size={15} /></button>
                               <button className="btn-icon btn-icon-sm" title="Download" style={{ color: '#3b82f6' }} onClick={() => handlePrint(doc)}><Download size={15} /></button>
                             </>}
+                            {doc.status === 'Approved' && (
+                              <button className="btn-icon btn-icon-sm" title="Mark Released" style={{ color: '#10b981' }}
+                                onClick={() => { setSelectedDoc(doc); setShowReleaseModal(true); }}>
+                                <CheckCircle size={15} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -396,6 +423,11 @@ const Documents = () => {
                 <input type="text" value={controlNumber} onChange={e => setControlNumber(e.target.value)} className="form-input" placeholder="CTRL-XXXXXX" />
                 <small style={{ color: '#64748b', fontSize: 12 }}>This will appear on the official document</small>
               </div>
+              <div className="form-group">
+                <label className="form-label">Signed by (Official)</label>
+                <input type="text" value={officialSignatory} onChange={e => setOfficialSignatory(e.target.value)} className="form-input" placeholder="e.g. Hon. Juan Dela Cruz, Punong Barangay" />
+                <small style={{ color: '#64748b', fontSize: 12 }}>Overrides default signatory on the printed document</small>
+              </div>
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowApproveModal(false)}>Cancel</button>
@@ -429,6 +461,36 @@ const Documents = () => {
               <button className="btn btn-secondary" onClick={() => setShowDenyModal(false)}>Cancel</button>
               <button className="btn btn-error" onClick={handleDenyConfirm} disabled={actionLoading}>
                 {actionLoading ? <><Loader size={15} className="animate-spin" />Processing...</> : <><X size={15} />Deny Request</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Release Modal */}
+      {showReleaseModal && (
+        <div className="modal-overlay" onClick={() => setShowReleaseModal(false)}>
+          <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title"><CheckCircle size={20} style={{ marginRight: 8, color: '#10b981' }} />Mark as Released</h3>
+              <button className="btn-icon" onClick={() => setShowReleaseModal(false)}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                <p style={{ margin: 0, fontSize: 14, color: '#166534' }}>
+                  Marking <strong>{selectedDoc?.documentType}</strong> as released to <strong>{selectedDoc?.requester?.name}</strong>
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#15803d' }}>Ctrl No: {selectedDoc?.document?.controlNumber || selectedDoc?.requestId}</p>
+              </div>
+              {selectedDoc?.requester?.contactNumber && (
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: 12, fontSize: 13, color: '#1d4ed8' }}>
+                  📱 An SMS notification will be sent to <strong>{selectedDoc.requester.contactNumber}</strong> (if SMS gateway is enabled in Settings).
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowReleaseModal(false)}>Cancel</button>
+              <button className="btn btn-success" onClick={handleReleaseConfirm} disabled={actionLoading}>
+                {actionLoading ? <><Loader size={15} className="animate-spin" />Processing...</> : <><CheckCircle size={15} />Confirm Release</>}
               </button>
             </div>
           </div>

@@ -6,7 +6,8 @@ import {
   Save, Plus, Edit2, Trash2, X, Loader, CheckCircle,
   AlertCircle, Shield, Phone, MapPin,
   ChevronRight, Lock, Eye, EyeOff, Download, Search,
-  ClipboardList, Hash, Calendar
+  ClipboardList, Hash, Calendar, BarChart2, TrendingUp,
+  Activity, Heart, Recycle, FileBarChart
 } from 'lucide-react';
 import {
   getBarangayProfile, saveBarangayProfile,
@@ -18,6 +19,15 @@ import {
   getPaymentConfig, savePaymentConfig,
   getSMSConfig, saveSMSConfig,
 } from '../services/settingsService';
+import { getResidentStatistics } from '../services/residentsService';
+import { getDocumentStatistics } from '../services/documentsService';
+import { getIncidentStatistics } from '../services/incidentsService';
+import { getHealthStatistics } from '../services/healthService';
+import { getWelfareStatistics } from '../services/welfareService';
+import { getWasteStats } from '../services/wasteService';
+import { useBarangayConfig } from '../hooks/useBarangayConfig';
+import { CEBU_BARANGAY_NAMES, getSitios, getGPSPoints } from '../data/cebuBarangays';
+import BarangayMap from '../components/map/BarangayMap';
 import { db } from '../services/firebase';
 import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, updatePassword, getAuth, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
@@ -119,6 +129,7 @@ const Btn = ({children,variant='primary',size='md',disabled,onClick,style={}}) =
 // ─── main component ───────────────────────────────────────────────────────────
 export default function Settings() {
   const { currentUser } = useAuth();
+  const { barangayName: activeBrgy, selectBarangay, sitios: activeSitios, gpsPoints, config, center: brgyCenter } = useBarangayConfig();
   const [tab, setTab]     = useState('profile');
   const [toast, setToast] = useState(null);
   const showToast = (msg, type='success') => setToast({msg,type});
@@ -182,6 +193,17 @@ export default function Settings() {
   const [smsSaving, setSmsSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
 
+  // analytics
+  const [kpi, setKpi]           = useState(null);
+  const [kpiLoad, setKpiLoad]   = useState(false);
+
+  // reports
+  const [rptModule, setRptModule] = useState('residents');
+  const [rptFrom,   setRptFrom]   = useState('');
+  const [rptTo,     setRptTo]     = useState('');
+  const [rptData,   setRptData]   = useState(null);
+  const [rptLoad,   setRptLoad]   = useState(false);
+
   // ── load on tab ──
   useEffect(() => {
     if (tab==='profile')       { loadProfile(); loadOfficials(); }
@@ -190,6 +212,7 @@ export default function Settings() {
     if (tab==='notifications') { loadNotif(); loadSMS(); }
     if (tab==='services')      loadFees();
     if (tab==='payment')       loadPayment();
+    if (tab==='analytics')     loadKPI();
   }, [tab]);
 
   const loadProfile   = async () => { const r=await getBarangayProfile(); if(r.success&&r.data){setProfile(p=>({...p,...r.data}));if(r.data.captainName)setCaptain(r.data.captainName);if(r.data.logoUrl)setLogoPreview(r.data.logoUrl);} };
@@ -201,6 +224,24 @@ export default function Settings() {
   const loadFees      = async () => { setFeesLoad(true); const r=await getDocumentFees(); if(r.success)setFees(r.data||[]); setFeesLoad(false); };
   const loadPayment   = async () => { const r=await getPaymentConfig(); if(r.success&&r.data)setPayment(r.data); };
   const loadSMS       = async () => { const r=await getSMSConfig(); if(r.success&&r.data)setSms(r.data); };
+  const loadKPI = async () => {
+    setKpiLoad(true);
+    try {
+      const [res, docs, inc, health, welfare, waste] = await Promise.all([
+        getResidentStatistics(), getDocumentStatistics(), getIncidentStatistics(),
+        getHealthStatistics(), getWelfareStatistics(), getWasteStats(),
+      ]);
+      setKpi({
+        residents: res.success ? res.data : null,
+        documents: docs.success ? docs.data : null,
+        incidents: inc.success ? inc.data : null,
+        health:    health.success ? health.data : null,
+        welfare:   welfare.success ? welfare.data : null,
+        waste:     waste.success ? waste.data : null,
+      });
+    } catch(_) {}
+    setKpiLoad(false);
+  };
 
   // ── save handlers ──
   const saveProfile = async () => {
@@ -345,12 +386,15 @@ export default function Settings() {
     {id:'notifications', label:'Notifications',     icon:Bell        },
     {id:'services',      label:'Services & Fees',   icon:FileText    },
     {id:'payment',       label:'Payment Gateway',   icon:CreditCard  },
+    {id:'analytics',     label:'KPI Dashboard',     icon:BarChart2   },
+    {id:'reports',       label:'Reports',           icon:FileBarChart },
     {id:'backup',        label:'Backup & Security', icon:Database    },
   ];
 
   // ─── render ───────────────────────────────────────────────────────────────
   return (
     <div className="page-container">
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <div className="page-header">
         <div className="page-header-content">
           <h1 className="page-title">Settings & Administration</h1>
@@ -399,6 +443,67 @@ export default function Settings() {
           {/* ══ PROFILE ══ */}
           {tab==='profile'&&(
             <>
+              {/* ── ACTIVE BARANGAY SELECTOR ── */}
+              <Card title="Active Barangay" subtitle="Select which Cebu City barangay this system manages — this controls all location dropdowns, GPS routes, and sitio names across every module">
+                <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:14,alignItems:'end',marginBottom:activeBrgy ? 16 : 0}}>
+                  <FG label="Select Barangay" required>
+                    <select className="form-select" value={profile.barangayName||activeBrgy||''} onChange={e=>{
+                      setProfile(p=>({...p,barangayName:e.target.value}));
+                      selectBarangay(e.target.value);
+                    }}>
+                      <option value="">-- Choose a Barangay --</option>
+                      {CEBU_BARANGAY_NAMES.map(b=><option key={b} value={b}>{b}, Cebu City</option>)}
+                    </select>
+                  </FG>
+                  <div style={{paddingBottom:2}}>
+                    {activeBrgy ? (
+                      <div style={{padding:'10px 14px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:10,fontSize:13,fontWeight:600,color:'#166534',whiteSpace:'nowrap'}}>
+                        <CheckCircle size={14} style={{display:'inline',marginRight:6,verticalAlign:'middle'}}/>
+                        Active: Brgy. {activeBrgy}
+                      </div>
+                    ) : (
+                      <div style={{padding:'10px 14px',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,fontSize:13,color:'#92400e'}}>
+                        No barangay selected
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {activeBrgy && getSitios(activeBrgy).length > 0 && (
+                  <div style={{background:'#f8fafc',borderRadius:10,padding:'14px 16px',border:'1px solid #f1f5f9'}}>
+                    <p style={{fontSize:12,fontWeight:600,color:'#374151',marginBottom:10,textTransform:'uppercase',letterSpacing:'0.05em'}}>
+                      Sitios / Zones in Brgy. {activeBrgy}
+                    </p>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                      {getSitios(activeBrgy).map(s=>(
+                        <span key={s} style={{fontSize:12,padding:'4px 10px',borderRadius:20,background:'#dbeafe',color:'#1e40af',fontWeight:500}}>{s}</span>
+                      ))}
+                    </div>
+                    <p style={{fontSize:11,color:'#94a3b8',marginTop:10}}>
+                      These sitio names will appear in resident address forms, waste management routes, DRRM vulnerability mapping, incident reports, and all location dropdowns across the system.
+                    </p>
+                  </div>
+                )}
+
+                {activeBrgy && gpsPoints.length > 0 && (
+                  <div style={{marginTop:14}}>
+                    <p style={{fontSize:12,fontWeight:600,color:'#374151',marginBottom:8,textTransform:'uppercase',letterSpacing:'0.05em'}}>
+                      Live Map — Brgy. {activeBrgy}, Cebu City
+                    </p>
+                    <BarangayMap
+                      barangayName={activeBrgy}
+                      points={gpsPoints}
+                      center={brgyCenter || {lat:10.3157,lng:123.8910}}
+                      mode="view"
+                      height={380}
+                    />
+                    <p style={{fontSize:11,color:'#94a3b8',marginTop:8}}>
+                      Click any pin to see details. These GPS coordinates power the route maps in Waste Management and evacuation planning in DRRM.
+                    </p>
+                  </div>
+                )}
+              </Card>
+
               <Card title="e-Barangay Identity" subtitle="Branding and basic barangay information for Cebu"
                 action={<Btn onClick={saveProfile} disabled={profLoad} size="sm">{profLoad?<><Loader size={14} className="animate-spin"/>Saving...</>:<><Save size={14}/>Save Profile</>}</Btn>}>
                 {/* Logo */}
@@ -618,6 +723,21 @@ export default function Settings() {
                     <Toggle checked={notif[item.key]||false} onChange={()=>setNotif(p=>({...p,[item.key]:!p[item.key]}))}/>
                   </div>
                 ))}
+
+                <p style={{fontSize:13,fontWeight:600,color:'#374151',margin:'18px 0 10px',paddingBottom:8,borderBottom:'1px solid #f1f5f9'}}>SMS Notification Triggers</p>
+                {[
+                  {key:'smsOnAlert',    label:'SMS on Emergency Alert',  desc:'Send SMS to residents when DRRM alert is broadcast'},
+                  {key:'smsOnDocument', label:'SMS on Document Ready',   desc:'Send SMS when a requested document is ready for pickup'},
+                ].map(item=>(
+                  <div key={item.key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 0',borderBottom:'1px solid #f8fafc'}}>
+                    <div>
+                      <p style={{fontSize:14,fontWeight:500,color:'#0f172a',margin:0}}>{item.label}</p>
+                      <p style={{fontSize:12,color:'#94a3b8',margin:'2px 0 0'}}>{item.desc}</p>
+                    </div>
+                    <Toggle checked={notif[item.key]||false} onChange={()=>setNotif(p=>({...p,[item.key]:!p[item.key]}))}/>
+                  </div>
+                ))}
+
                 <div style={{marginTop:16}}>
                   <FG label="Reminder days before document expiry">
                     <input type="number" className="form-input" style={{maxWidth:100}} value={notif.reminderDays||3} onChange={e=>setNotif(p=>({...p,reminderDays:Number(e.target.value)}))} min="1" max="30"/>
@@ -760,6 +880,262 @@ export default function Settings() {
                 <p style={{fontSize:12,color:'#64748b',margin:0,lineHeight:1.6}}>1. Register at <strong>paymongo.com</strong> as a merchant<br/>2. Complete KYC verification<br/>3. Get your API keys from the PayMongo dashboard<br/>4. Paste your keys above and save<br/>5. Switch to Live Mode when ready to accept real payments</p>
               </div>
             </Card>
+          )}
+
+          {/* ══ KPI ANALYTICS DASHBOARD ══ */}
+          {tab==='analytics'&&(
+            <>
+              <Card title="KPI Analytics Dashboard" subtitle="Live key performance indicators across all barangay modules"
+                action={<button className="btn btn-secondary btn-sm" onClick={loadKPI}><TrendingUp size={14}/>Refresh</button>}>
+                {kpiLoad ? (
+                  <div style={{textAlign:'center',padding:40}}><Loader size={28} style={{color:'#3b82f6',animation:'spin 1s linear infinite',display:'block',margin:'0 auto'}}/><p style={{fontSize:13,color:'#94a3b8',marginTop:12}}>Loading data from all modules...</p></div>
+                ) : !kpi ? (
+                  <div style={{textAlign:'center',padding:40}}><BarChart2 size={36} style={{color:'#cbd5e1',display:'block',margin:'0 auto 10px'}}/><p style={{fontSize:13,color:'#94a3b8'}}>Click Refresh to load KPI data</p></div>
+                ) : (
+                  <>
+                    {/* Module KPI cards */}
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12,marginBottom:24}}>
+                      {[
+                        {label:'Total Residents',    value:kpi.residents?.total ?? '—',         sub:`${kpi.residents?.male ?? 0}M / ${kpi.residents?.female ?? 0}F`,        color:'#3b82f6', bg:'#eff6ff', Icon:Users},
+                        {label:'Documents Issued',   value:kpi.documents?.released ?? '—',      sub:`${kpi.documents?.pending ?? 0} pending`,                               color:'#8b5cf6', bg:'#f5f3ff', Icon:FileText},
+                        {label:'Open Incidents',     value:kpi.incidents?.open ?? '—',          sub:`${kpi.incidents?.total ?? 0} total`,                                    color:'#ef4444', bg:'#fef2f2', Icon:AlertCircle},
+                        {label:'Health Patients',    value:kpi.health?.totalPatients ?? '—',    sub:`${kpi.health?.scheduledAppointments ?? 0} appointments`,                color:'#10b981', bg:'#f0fdf4', Icon:Activity},
+                        {label:'Active Beneficiaries',value:kpi.welfare?.totalBeneficiaries ?? '—', sub:`${kpi.welfare?.activePrograms ?? 0} programs`,                    color:'#f59e0b', bg:'#fffbeb', Icon:Heart},
+                        {label:'Pending Reports',    value:kpi.waste?.pendingReports ?? '—',    sub:`${kpi.waste?.activeVehicles ?? 0} vehicles active`,                    color:'#06b6d4', bg:'#ecfeff', Icon:Recycle},
+                        {label:'Voters',             value:kpi.residents?.voters ?? '—',        sub:`of ${kpi.residents?.total ?? 0} residents`,                            color:'#64748b', bg:'#f8fafc', Icon:ClipboardList},
+                        {label:'Senior Citizens',    value:kpi.residents?.seniorCitizens ?? '—',sub:`${kpi.residents?.pwd ?? 0} PWDs`,                                      color:'#d97706', bg:'#fffbeb', Icon:Shield},
+                      ].map(({label,value,sub,color,bg,Icon}) => (
+                        <div key={label} style={{background:bg,borderRadius:12,padding:'16px 18px',border:`1px solid ${color}22`}}>
+                          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                            <div style={{width:32,height:32,borderRadius:8,background:color+'22',display:'flex',alignItems:'center',justifyContent:'center'}}><Icon size={16} color={color}/></div>
+                            <span style={{fontSize:12,fontWeight:600,color:'#64748b'}}>{label}</span>
+                          </div>
+                          <div style={{fontSize:28,fontWeight:800,color,lineHeight:1,marginBottom:4}}>{value}</div>
+                          <div style={{fontSize:12,color:'#94a3b8'}}>{sub}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Document breakdown bar chart */}
+                    {kpi.documents && (
+                      <div style={{background:'#f8fafc',borderRadius:12,padding:'18px 20px',marginBottom:16}}>
+                        <p style={{fontSize:13,fontWeight:700,color:'#0f172a',marginBottom:14}}>Document Requests by Status</p>
+                        {[
+                          {label:'Released',   value:kpi.documents.released  ?? 0, color:'#10b981'},
+                          {label:'Approved',   value:kpi.documents.approved  ?? 0, color:'#3b82f6'},
+                          {label:'Processing', value:kpi.documents.processing?? 0, color:'#f59e0b'},
+                          {label:'Pending',    value:kpi.documents.pending   ?? 0, color:'#94a3b8'},
+                          {label:'Denied',     value:kpi.documents.denied    ?? 0, color:'#ef4444'},
+                        ].map(({label,value,color}) => {
+                          const max = Math.max(kpi.documents.total, 1);
+                          return (
+                            <div key={label} style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+                              <span style={{fontSize:12,color:'#64748b',minWidth:80}}>{label}</span>
+                              <div style={{flex:1,height:10,background:'#e2e8f0',borderRadius:5,overflow:'hidden'}}>
+                                <div style={{height:'100%',width:`${(value/max)*100}%`,background:color,borderRadius:5,transition:'width .6s ease'}}/>
+                              </div>
+                              <span style={{fontSize:12,fontWeight:700,color,minWidth:28,textAlign:'right'}}>{value}</span>
+                            </div>
+                          );
+                        })}
+                        {kpi.documents.totalRevenue > 0 && (
+                          <p style={{fontSize:13,color:'#059669',fontWeight:600,marginTop:10}}>Total Document Revenue: PHP {(kpi.documents.totalRevenue||0).toLocaleString('en-PH')}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Incident breakdown */}
+                    {kpi.incidents && (
+                      <div style={{background:'#f8fafc',borderRadius:12,padding:'18px 20px',marginBottom:16}}>
+                        <p style={{fontSize:13,fontWeight:700,color:'#0f172a',marginBottom:14}}>Incident Cases by Status</p>
+                        {[
+                          {label:'Open',           value:kpi.incidents.open           ?? 0, color:'#ef4444'},
+                          {label:'Under Mediation',value:kpi.incidents.underMediation ?? 0, color:'#f59e0b'},
+                          {label:'Resolved',       value:kpi.incidents.resolved       ?? 0, color:'#10b981'},
+                        ].map(({label,value,color}) => {
+                          const max = Math.max(kpi.incidents.total, 1);
+                          return (
+                            <div key={label} style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+                              <span style={{fontSize:12,color:'#64748b',minWidth:130}}>{label}</span>
+                              <div style={{flex:1,height:10,background:'#e2e8f0',borderRadius:5,overflow:'hidden'}}>
+                                <div style={{height:'100%',width:`${(value/max)*100}%`,background:color,borderRadius:5,transition:'width .6s ease'}}/>
+                              </div>
+                              <span style={{fontSize:12,fontWeight:700,color,minWidth:28,textAlign:'right'}}>{value}</span>
+                            </div>
+                          );
+                        })}
+                        {kpi.incidents.avgResolutionTime > 0 && (
+                          <p style={{fontSize:12,color:'#64748b',marginTop:8}}>Avg. resolution time: {kpi.incidents.avgResolutionTime} days</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Health + Welfare row */}
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+                      {kpi.health && (
+                        <div style={{background:'#f0fdf4',borderRadius:12,padding:'16px 18px',border:'1px solid #bbf7d0'}}>
+                          <p style={{fontSize:13,fontWeight:700,color:'#166534',marginBottom:12}}>Health Services Summary</p>
+                          {[
+                            ['Total Patients',          kpi.health.totalPatients ?? 0],
+                            ['Scheduled Appointments',  kpi.health.scheduledAppointments ?? 0],
+                            ['Total Immunizations',     kpi.health.totalImmunizations ?? 0],
+                            ['Active Disease Cases',    kpi.health.activeDiseases ?? 0],
+                            ['Low Stock Medicines',     kpi.health.lowStockMedicines ?? 0],
+                          ].map(([l,v]) => (
+                            <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #dcfce7',fontSize:13}}>
+                              <span style={{color:'#166534'}}>{l}</span>
+                              <span style={{fontWeight:700,color:'#166534'}}>{v}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {kpi.welfare && (
+                        <div style={{background:'#fffbeb',borderRadius:12,padding:'16px 18px',border:'1px solid #fde68a'}}>
+                          <p style={{fontSize:13,fontWeight:700,color:'#92400e',marginBottom:12}}>Social Welfare Summary</p>
+                          {[
+                            ['Total Programs',        kpi.welfare.totalPrograms       ?? 0],
+                            ['Active Programs',       kpi.welfare.activePrograms      ?? 0],
+                            ['Total Beneficiaries',   kpi.welfare.totalBeneficiaries  ?? 0],
+                            ['Total Aid Distributed', 'PHP ' + (kpi.welfare.totalDistributed ?? 0).toLocaleString('en-PH')],
+                          ].map(([l,v]) => (
+                            <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #fef3c7',fontSize:13}}>
+                              <span style={{color:'#92400e'}}>{l}</span>
+                              <span style={{fontWeight:700,color:'#92400e'}}>{v}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </Card>
+            </>
+          )}
+
+          {/* ══ REPORTS ══ */}
+          {tab==='reports'&&(
+            <>
+              <Card title="Customizable Reports" subtitle="Generate and export reports from any module with date filters">
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr auto',gap:12,alignItems:'end',marginBottom:20,padding:'16px 18px',background:'#f8fafc',borderRadius:12,border:'1px solid #f1f5f9'}}>
+                  <FG label="Module" required>
+                    <select className="form-select" value={rptModule} onChange={e=>{setRptModule(e.target.value);setRptData(null);}}>
+                      {[
+                        {v:'residents',  l:'Residents'},
+                        {v:'documents',  l:'Documents'},
+                        {v:'incidents',  l:'Incidents'},
+                        {v:'health',     l:'Health Services'},
+                        {v:'welfare',    l:'Social Welfare'},
+                        {v:'waste',      l:'Waste Management'},
+                      ].map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
+                    </select>
+                  </FG>
+                  <FG label="Date From">
+                    <input type="date" className="form-input" value={rptFrom} onChange={e=>setRptFrom(e.target.value)}/>
+                  </FG>
+                  <FG label="Date To">
+                    <input type="date" className="form-input" value={rptTo} onChange={e=>setRptTo(e.target.value)}/>
+                  </FG>
+                  <button className="btn btn-primary btn-md" disabled={rptLoad}
+                    onClick={async()=>{
+                      setRptLoad(true); setRptData(null);
+                      try {
+                        let result = null;
+                        if (rptModule==='residents') { const r=await getResidentStatistics(); result=r.data; }
+                        else if (rptModule==='documents') { const r=await getDocumentStatistics(); result=r.data; }
+                        else if (rptModule==='incidents') { const r=await getIncidentStatistics(); result=r.data; }
+                        else if (rptModule==='health')    { const r=await getHealthStatistics();   result=r.data; }
+                        else if (rptModule==='welfare')   { const r=await getWelfareStatistics();  result=r.data; }
+                        else if (rptModule==='waste')     { const r=await getWasteStats();         result=r.data; }
+                        setRptData(result);
+                      } catch(_) {}
+                      setRptLoad(false);
+                    }}>
+                    {rptLoad ? <><Loader size={14} style={{animation:'spin 1s linear infinite'}}/>Generating...</> : <><FileBarChart size={14}/>Generate</>}
+                  </button>
+                </div>
+
+                {rptData && (
+                  <div>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+                      <p style={{fontSize:14,fontWeight:700,color:'#0f172a',margin:0,textTransform:'capitalize'}}>{rptModule} Report — {new Date().toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric'})}</p>
+                      <button className="btn btn-secondary btn-sm" onClick={()=>{
+                        const rows = Object.entries(rptData).map(([k,v])=>`${k}\t${typeof v==='object'?JSON.stringify(v):v}`).join('\n');
+                        const blob = new Blob([`${rptModule.toUpperCase()} REPORT\nGenerated: ${new Date().toLocaleString('en-PH')}\nDate Range: ${rptFrom||'All'} to ${rptTo||'All'}\n\n${rows}`],{type:'text/plain'});
+                        const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+                        a.download=`${rptModule}_report_${new Date().toISOString().split('T')[0]}.txt`; a.click();
+                      }}>
+                        <Download size={13}/>Export TXT
+                      </button>
+                    </div>
+
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:10,marginBottom:16}}>
+                      {Object.entries(rptData)
+                        .filter(([k,v]) => typeof v === 'number')
+                        .map(([k,v]) => (
+                          <div key={k} style={{background:'#f8fafc',borderRadius:10,padding:'12px 14px',border:'1px solid #f1f5f9'}}>
+                            <div style={{fontSize:22,fontWeight:800,color:'#0f172a'}}>{v.toLocaleString('en-PH')}</div>
+                            <div style={{fontSize:11,color:'#94a3b8',marginTop:3,textTransform:'capitalize'}}>{k.replace(/([A-Z])/g,' $1').toLowerCase()}</div>
+                          </div>
+                        ))
+                      }
+                    </div>
+
+                    {Object.entries(rptData)
+                      .filter(([k,v]) => v && typeof v==='object' && !Array.isArray(v))
+                      .map(([k,v]) => (
+                        <div key={k} style={{marginBottom:14,background:'#f8fafc',borderRadius:10,padding:'14px 16px',border:'1px solid #f1f5f9'}}>
+                          <p style={{fontSize:12,fontWeight:700,color:'#374151',marginBottom:10,textTransform:'capitalize'}}>{k.replace(/([A-Z])/g,' $1')}</p>
+                          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                            {Object.entries(v).map(([subk,subv])=>(
+                              <div key={subk} style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:13}}>
+                                <span style={{color:'#64748b',textTransform:'capitalize'}}>{subk.replace(/([A-Z])/g,' $1')}</span>
+                                <span style={{fontWeight:600,color:'#0f172a'}}>{typeof subv==='number'?subv.toLocaleString('en-PH'):String(subv)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    }
+
+                    <div style={{padding:'12px 16px',background:'#eff6ff',borderRadius:10,border:'1px solid #bfdbfe',fontSize:12,color:'#1e40af'}}>
+                      Report generated on {new Date().toLocaleString('en-PH')} | Module: {rptModule} | Date filter: {rptFrom||'All'} to {rptTo||'All'}
+                    </div>
+                  </div>
+                )}
+
+                {!rptData && !rptLoad && (
+                  <div style={{textAlign:'center',padding:'40px 0',color:'#94a3b8'}}>
+                    <FileBarChart size={40} style={{display:'block',margin:'0 auto 12px',opacity:0.3}}/>
+                    <p style={{fontSize:13}}>Select a module and click Generate to build your report.</p>
+                  </div>
+                )}
+              </Card>
+
+              {/* Quick report templates */}
+              <Card title="Quick Report Templates" subtitle="Pre-configured common reports for barangay operations">
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:10}}>
+                  {[
+                    {label:'Monthly Resident Summary',    module:'residents', desc:'Total residents by gender, purok, and civil status'},
+                    {label:'Document Issuance Report',    module:'documents', desc:'Documents released, pending, and total revenue collected'},
+                    {label:'Incident Resolution Report',  module:'incidents', desc:'Open vs resolved cases and average resolution time'},
+                    {label:'Health Service Summary',      module:'health',    desc:'Patient count, immunizations, and disease cases'},
+                    {label:'Beneficiary Aid Report',      module:'welfare',   desc:'Total beneficiaries and aid distributed by program'},
+                    {label:'Waste Collection Summary',    module:'waste',     desc:'Active vehicles, schedules, and pending reports'},
+                  ].map(t=>(
+                    <div key={t.label} style={{padding:'14px 16px',background:'#f8fafc',borderRadius:10,border:'1px solid #f1f5f9',cursor:'pointer',transition:'box-shadow .2s'}}
+                      onMouseEnter={e=>e.currentTarget.style.boxShadow='0 2px 12px rgba(0,0,0,0.08)'}
+                      onMouseLeave={e=>e.currentTarget.style.boxShadow=''}
+                      onClick={()=>{setRptModule(t.module);}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                        <span style={{fontSize:13,fontWeight:600,color:'#0f172a'}}>{t.label}</span>
+                        <ChevronRight size={14} color="#94a3b8"/>
+                      </div>
+                      <p style={{fontSize:12,color:'#64748b',margin:0,lineHeight:1.5}}>{t.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </>
           )}
 
           {/* ══ BACKUP & SECURITY ══ */}

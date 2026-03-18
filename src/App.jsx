@@ -10,6 +10,10 @@ import './styles/Tailwindenhancement.css';
 import './styles/Animations.css';
 import './styles/Globalstyles.css';
 import './styles/Pagestyles.css';
+// UI Enhancement layer — must come last to override
+import './styles/UIEnhancements.css';
+import './styles/MobileEnhancements.css';
+import './styles/PageEnhancements.css';
 
 // Auth Pages
 import Login from './pages/auth/Login';

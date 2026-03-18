@@ -133,12 +133,12 @@ export const useDocuments = () => {
   }, [currentUser]);
 
   // Approve document
-  const approve = useCallback(async (documentId, controlNumber, validityMonths = 12) => {
+  const approve = useCallback(async (documentId, controlNumber, signatory = '', validityMonths = 12) => {
     setLoading(true);
     setError(null);
 
     try {
-      const result = await approveDocument(documentId, currentUser.uid, controlNumber, validityMonths);
+      const result = await approveDocument(documentId, currentUser.uid, controlNumber, signatory, validityMonths);
 
       if (result.success) {
         await loadDocuments();

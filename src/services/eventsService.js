@@ -21,6 +21,8 @@ export const createEvent = async (data, userId) => {
       location:     data.location || '',
       organizer:    data.organizer || 'Admin',
       rsvps:        0,
+      reminderDays:  data.reminderDays ?? 1,
+      linkedModule:  data.linkedModule || 'None',
       status:       'Upcoming',                        // Upcoming | Ongoing | Completed | Cancelled
       systemInfo: {
         createdAt: serverTimestamp(),

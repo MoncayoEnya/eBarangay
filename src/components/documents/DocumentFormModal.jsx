@@ -1,11 +1,12 @@
 // src/components/documents/DocumentFormModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, Save, Loader, FileText, User, CreditCard,
-  ChevronRight, ChevronLeft, CheckCircle, Wand2, Sparkles,
+  ChevronRight, ChevronLeft, CheckCircle, Wand2, Sparkles, Search, UserCheck, AlertTriangle,
 } from 'lucide-react';
 import { useDocuments } from '../../hooks/useDocuments';
 import { DOCUMENT_TYPES } from '../../services/documentsService';
+import { searchResidents } from '../../services/residentsService';
 
 const PAYMENT_METHODS = ['Cash', 'GCash', 'PayMaya', 'Online Banking', 'Free of Charge'];
 
@@ -92,6 +93,11 @@ const DocumentFormModal = ({ isOpen, onClose, document: docProp = null, onSucces
   const [aiError,   setAiError]   = useState('');
   const [aiApplied, setAiApplied] = useState(false);
 
+  // Resident verification state
+  const [verifying,      setVerifying]      = useState(false);
+  const [verifiedResident, setVerifiedResident] = useState(null); // resident data if found
+  const [verifyStatus,   setVerifyStatus]   = useState(null); // 'found' | 'not_found' | null
+
   const empty = {
     requesterName: '', contactNumber: '', requesterAddress: '',
     residentId: '', documentTypeId: '', purpose: '',
@@ -126,11 +132,12 @@ const DocumentFormModal = ({ isOpen, onClose, document: docProp = null, onSucces
       setAiResult(null);
       setAiError('');
       setAiApplied(false);
+      setVerifiedResident(null);
+      setVerifyStatus(null);
     }
   }, [isOpen, docProp]);
 
-  if (!isOpen) return null;
-
+  // NOTE: early return moved to AFTER all hooks — Rules of Hooks requirement
   const set = (field, val) => {
     setForm(p => ({ ...p, [field]: val }));
     if (errors[field]) setErrors(p => ({ ...p, [field]: '' }));
@@ -160,7 +167,6 @@ const DocumentFormModal = ({ isOpen, onClose, document: docProp = null, onSucces
 
   const applyAiResult = () => {
     if (!aiResult) return;
-    // Find matching document type key
     const matchedType = DOC_TYPE_LIST.find(
       d => d.name.toLowerCase() === aiResult.documentType?.toLowerCase()
     );
@@ -175,6 +181,39 @@ const DocumentFormModal = ({ isOpen, onClose, document: docProp = null, onSucces
     setAiApplied(true);
     setErrors({});
   };
+
+  // Auto-verify resident against database
+  const verifyResident = useCallback(async () => {
+    const name = form.requesterName.trim();
+    if (name.length < 2) return;
+    setVerifying(true);
+    setVerifyStatus(null);
+    setVerifiedResident(null);
+    try {
+      const result = await searchResidents(name);
+      if (result.success && result.data?.length > 0) {
+        // Find closest match by name
+        const found = result.data.find(r =>
+          (r.firstName + ' ' + r.lastName).toLowerCase().includes(name.toLowerCase()) ||
+          name.toLowerCase().includes((r.firstName || '').toLowerCase())
+        ) || result.data[0];
+        setVerifiedResident(found);
+        setVerifyStatus('found');
+        // Auto-fill address and contact if empty
+        setForm(p => ({
+          ...p,
+          residentId:       found.id || p.residentId,
+          requesterAddress: p.requesterAddress || [found.address?.houseNumber, found.address?.street, found.address?.sitio].filter(Boolean).join(', '),
+          contactNumber:    p.contactNumber    || found.contactNumber || '',
+        }));
+      } else {
+        setVerifyStatus('not_found');
+      }
+    } catch (_) {
+      setVerifyStatus('not_found');
+    }
+    setVerifying(false);
+  }, [form.requesterName]);
 
   // ── Validation ──
   const validateStep = (s) => {
@@ -219,6 +258,9 @@ const DocumentFormModal = ({ isOpen, onClose, document: docProp = null, onSucces
 
   // Confidence badge colour
   const confColor = { high: '#16a34a', medium: '#d97706', low: '#dc2626' };
+
+  // Early return AFTER all hooks — safe per Rules of Hooks
+  if (!isOpen) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -419,9 +461,37 @@ const DocumentFormModal = ({ isOpen, onClose, document: docProp = null, onSucces
 
               {/* Manual fields */}
               <Field label="Full Name" required error={errors.requesterName}>
-                <input className={`form-input ${errors.requesterName ? 'error' : ''}`}
-                  value={form.requesterName} onChange={e => set('requesterName', e.target.value)}
-                  placeholder="Juan Dela Cruz" />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input className={`form-input ${errors.requesterName ? 'error' : ''}`}
+                    value={form.requesterName} onChange={e => { set('requesterName', e.target.value); setVerifyStatus(null); setVerifiedResident(null); }}
+                    placeholder="Juan Dela Cruz" style={{ flex: 1 }} />
+                  <button type="button" onClick={verifyResident} disabled={verifying || form.requesterName.trim().length < 2}
+                    title="Verify against resident database"
+                    style={{ padding: '0 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: verifyStatus === 'found' ? '#f0fdf4' : verifyStatus === 'not_found' ? '#fff7ed' : '#f8fafc', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: verifyStatus === 'found' ? '#16a34a' : verifyStatus === 'not_found' ? '#d97706' : '#64748b', whiteSpace: 'nowrap' }}>
+                    {verifying ? <Loader size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> : verifyStatus === 'found' ? <UserCheck size={14} /> : <Search size={14} />}
+                    {verifying ? 'Checking…' : verifyStatus === 'found' ? 'Verified' : verifyStatus === 'not_found' ? 'Not found' : 'Verify'}
+                  </button>
+                </div>
+                {/* Verification result banner */}
+                {verifyStatus === 'found' && verifiedResident && (
+                  <div style={{ marginTop: 8, padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, fontSize: 13 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <UserCheck size={14} color="#16a34a" />
+                      <span style={{ fontWeight: 600, color: '#166534' }}>Resident found in database</span>
+                    </div>
+                    <div style={{ color: '#374151', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span><strong>Status:</strong> {verifiedResident.status || 'Active'}</span>
+                      {verifiedResident.address?.sitio && <span><strong>Purok/Sitio:</strong> {verifiedResident.address.sitio}</span>}
+                      {verifiedResident.voterStatus && <span><strong>Voter:</strong> {verifiedResident.voterStatus}</span>}
+                    </div>
+                  </div>
+                )}
+                {verifyStatus === 'not_found' && (
+                  <div style={{ marginTop: 8, padding: '8px 12px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, fontSize: 12, color: '#c2410c', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <AlertTriangle size={13} />
+                    Name not found in resident database. You may still proceed.
+                  </div>
+                )}
               </Field>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <Field label="Contact Number" required error={errors.contactNumber}>
@@ -429,10 +499,11 @@ const DocumentFormModal = ({ isOpen, onClose, document: docProp = null, onSucces
                     value={form.contactNumber} onChange={e => set('contactNumber', e.target.value)}
                     placeholder="09XX XXX XXXX" />
                 </Field>
-                <Field label="Resident ID" hint="If registered in the system">
+                <Field label="Resident ID" hint="Auto-filled if verified">
                   <input className="form-input" value={form.residentId}
                     onChange={e => set('residentId', e.target.value)}
-                    placeholder="Leave blank if unknown" />
+                    placeholder="Leave blank if unknown" readOnly={!!verifiedResident}
+                    style={{ background: verifiedResident ? '#f0fdf4' : undefined }} />
                 </Field>
               </div>
               <Field label="Address" hint="Street / Purok / Barangay">

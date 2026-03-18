@@ -429,7 +429,7 @@ export const updateDocumentStatus = async (documentId, newStatus, userId, notes 
 // ============================================
 // UPDATE - Approve Document
 // ============================================
-export const approveDocument = async (documentId, userId, controlNumber, validityMonths = 12) => {
+export const approveDocument = async (documentId, userId, controlNumber, signatory = '', validityMonths = 12) => {
   try {
     const docRef = doc(db, COLLECTION_NAME, documentId);
     
@@ -441,6 +441,7 @@ export const approveDocument = async (documentId, userId, controlNumber, validit
       status: 'Approved',
       'document.controlNumber': controlNumber,
       'document.validUntil': Timestamp.fromDate(validUntil),
+      'document.signatory': signatory || '',
       'processing.approvedBy': userId,
       'systemInfo.approvedDate': serverTimestamp(),
       'systemInfo.updatedAt': serverTimestamp(),

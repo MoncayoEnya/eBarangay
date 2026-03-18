@@ -1,11 +1,13 @@
 // src/pages/DRRM.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import StatCard from '../components/layout/common/StatCard';
 import { useDRRM } from '../hooks/useDRRM';
+import { useBarangayConfig } from '../hooks/useBarangayConfig';
+import BarangayMap from '../components/map/BarangayMap';
 import {
   AlertTriangle, AlertCircle, Users, Shield, MapPin, Plus, Edit,
   CheckCircle, Trash2, X, Save, Home, Loader, Bell, Phone,
-  ClipboardList, ChevronRight, FileText
+  ClipboardList, ChevronRight, FileText, Map
 } from 'lucide-react';
 
 const ALERT_LEVELS    = ['advisory','warning','critical'];
@@ -13,7 +15,7 @@ const CENTER_STATUSES = ['Standby','Active','Full','Closed'];
 const DAMAGE_TYPES    = ['House / Structure','Road / Bridge','Farmland','Electrical','Water System','Others'];
 const DAMAGE_SEV      = ['Minor','Moderate','Severe','Total Loss'];
 const VULN_CATS       = ['Elderly (60+)','PWD','Infant / Child','Pregnant','Chronic Illness','Flood Zone','Landslide Zone','Coastal'];
-const PUROKS          = ['Purok 1','Purok 2','Purok 3','Purok 4','Purok 5','Purok 6','Purok 7','Purok 8','Purok 9','Purok 10'];
+// PUROKS from useBarangayConfig
 const HOTLINES        = [
   {name:'PNP Emergency',number:'911',color:'#2563eb'},
   {name:'Bureau of Fire',number:'(032) 412-1234',color:'#dc2626'},
@@ -23,12 +25,13 @@ const HOTLINES        = [
   {name:'PhilHealth',number:'1-800-100-7441',color:'#7c3aed'},
 ];
 const TABS = [
-  {id:'alerts',label:'Alerts',icon:Bell},
-  {id:'centers',label:'Evacuation Centers',icon:Home},
-  {id:'vuln',label:'Vulnerable Residents',icon:Users},
-  {id:'damage',label:'Damage Assessment',icon:ClipboardList},
-  {id:'command',label:'Incident Command',icon:Shield},
-  {id:'hotlines',label:'Emergency Hotlines',icon:Phone},
+  {id:'map',     label:'Emergency Map',      icon:Map},
+  {id:'alerts',  label:'Alerts',             icon:Bell},
+  {id:'centers', label:'Evacuation Centers', icon:Home},
+  {id:'vuln',    label:'Vulnerable',         icon:Users},
+  {id:'damage',  label:'Damage Assessment',  icon:ClipboardList},
+  {id:'command', label:'Incident Command',   icon:Shield},
+  {id:'hotlines',label:'Emergency Hotlines', icon:Phone},
 ];
 
 const levelSt  = (l) => ({advisory:{bg:'#eff6ff',color:'#1d4ed8',bar:'#3b82f6',border:'#bfdbfe'},warning:{bg:'#fffbeb',color:'#92400e',bar:'#f59e0b',border:'#fde68a'},critical:{bg:'#fef2f2',color:'#991b1b',bar:'#ef4444',border:'#fecaca'}}[l]||{bg:'#fffbeb',color:'#92400e',bar:'#f59e0b',border:'#fde68a'});
@@ -49,23 +52,48 @@ const fmtTime = (ts) => {
 
 const Bdg = ({label,bg,color}) => <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:999,background:bg,color,textTransform:'uppercase',letterSpacing:'.04em'}}>{label}</span>;
 
-const ModalCard = ({title,children,onClose,maxWidth=540}) => (
-  <>
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.3)',zIndex:1000}}/>
-    <div style={{position:'fixed',top:'50%',left:'50%',transform:'translate(-50%,-50%)',zIndex:1001,width:'100%',maxWidth,maxHeight:'90vh',background:'#fff',borderRadius:18,boxShadow:'0 24px 64px rgba(0,0,0,0.2)',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{padding:'18px 24px',borderBottom:'1px solid #f1f5f9',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}>
-        <h3 style={{fontSize:16,fontWeight:700,margin:0,color:'#0f172a'}}>{title}</h3>
-        <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'#64748b'}}><X size={20}/></button>
+const ModalCard = ({ title, subtitle, icon: Icon, headerColor = '#2563EB', headerGradient, children, onClose, maxWidth = 540 }) => {
+  const grad = headerGradient || `linear-gradient(135deg, ${headerColor} 0%, ${headerColor}cc 100%)`;
+  return (
+    <>
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.45)', zIndex:1000, backdropFilter:'blur(6px)' }} />
+      <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', zIndex:1001, width:'100%', maxWidth, maxHeight:'90vh', background:'#fff', borderRadius:22, boxShadow:'0 24px 64px rgba(15,23,42,0.20), 0 0 0 1.5px rgba(240,244,248,1)', display:'flex', flexDirection:'column', overflow:'hidden', animation:'slideInUp 0.22s cubic-bezier(0.34,1.15,0.64,1)' }}>
+        {/* Gradient header */}
+        <div style={{ background: grad, padding:'20px 24px 18px', flexShrink:0, position:'relative', overflow:'hidden' }}>
+          <div style={{ position:'absolute', right:-20, top:-20, width:100, height:100, borderRadius:'50%', background:'rgba(255,255,255,0.07)', pointerEvents:'none' }} />
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', position:'relative' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+              {Icon && (
+                <div style={{ width:40, height:40, borderRadius:11, background:'rgba(255,255,255,0.18)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <Icon size={20} color="#fff" />
+                </div>
+              )}
+              <div>
+                <h3 style={{ fontSize:16, fontWeight:800, margin:0, color:'#fff', letterSpacing:'-0.02em' }}>{title}</h3>
+                {subtitle && <p style={{ fontSize:12, color:'rgba(255,255,255,0.72)', margin:'2px 0 0', fontWeight:400 }}>{subtitle}</p>}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ width:30, height:30, borderRadius:8, background:'rgba(255,255,255,0.15)', border:'none', cursor:'pointer', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', transition:'background 0.15s', flexShrink:0 }}
+              onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.25)'}
+              onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.15)'}>
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+        {/* Body */}
+        <div style={{ overflowY:'auto', padding:'22px 24px', flex:1, display:'flex', flexDirection:'column', gap:16 }}>{children}</div>
       </div>
-      <div style={{overflowY:'auto',padding:'20px 24px',flex:1}}>{children}</div>
-    </div>
-  </>
-);
+    </>
+  );
+};
 
-const FG = ({label,required,children}) => (
-  <div className="form-group">
-    <label className="form-label">{label}{required&&<span style={{color:'#ef4444'}}> *</span>}</label>
+const FG = ({label, required, hint, children}) => (
+  <div className="form-group" style={{ marginBottom:0 }}>
+    <label className="form-label">
+      {label}{required && <span style={{color:'#EF4444', marginLeft:2}}>*</span>}
+    </label>
     {children}
+    {hint && <span style={{ fontSize:11.5, color:'#94A3B8', display:'block', marginTop:4 }}>{hint}</span>}
   </div>
 );
 
@@ -80,13 +108,38 @@ const Empty = ({icon:Icon,title,desc,action}) => (
 
 export default function DRRM() {
   const hook = useDRRM();
+  const { barangayName, sitiosWithAll, gpsPoints, center, config } = useBarangayConfig();
+  const PUROKS = sitiosWithAll.length > 1
+    ? sitiosWithAll.filter(s => s !== 'All Areas')
+    : ['Purok 1','Purok 2','Purok 3','Purok 4','Purok 5','Purok 6','Purok 7'];
+
   const alerts      = Array.isArray(hook.alerts)      ? hook.alerts      : [];
   const centers     = Array.isArray(hook.centers)     ? hook.centers     : [];
   const vulnerables = Array.isArray(hook.vulnerables) ? hook.vulnerables : [];
   const damages     = Array.isArray(hook.damages)     ? hook.damages     : [];
   const tasks       = Array.isArray(hook.tasks)       ? hook.tasks       : [];
 
-  const [tab,setTab] = useState('alerts');
+  const [tab,setTab] = useState('map');
+  const [showRoutes, setShowRoutes] = useState(false);
+
+  // Build DRRM map: all sitio/hall/MRF points with flood risk markers
+  const drrmMapPoints = useMemo(() => {
+    return gpsPoints.map(p => ({ ...p }));
+  }, [gpsPoints]);
+
+  // Evacuation routes: each sitio draws a line to the barangay hall
+  const allRoutePoints = useMemo(() => {
+    const hall = gpsPoints.find(p => p.type === 'hall');
+    if (!hall || gpsPoints.length < 2) return [];
+    const sitios = gpsPoints.filter(p => p.type === 'sitio' || p.type === 'zone');
+    if (!sitios.length) return [];
+    // Build one continuous route: hall -> all sitios -> back to hall
+    return [
+      { lat: hall.lat, lng: hall.lng, label: hall.label },
+      ...sitios,
+      { lat: hall.lat, lng: hall.lng, label: hall.label + ' (Return)' },
+    ];
+  }, [gpsPoints]);
 
   const [showA,setShowA]   = useState(false);
   const [aF,setAF]         = useState({title:'',message:'',level:'warning',audience:'All Residents',location:'',instructions:''});
@@ -221,6 +274,117 @@ export default function DRRM() {
           </button>
         );})}
       </div>
+
+      {/* MAP TAB */}
+      {tab==='map'&&(
+        <div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div>
+              <h3 style={{fontSize:15,fontWeight:700,color:'#0f172a',margin:'0 0 2px'}}>
+                Emergency Map — {barangayName ? `Brgy. ${barangayName}, Cebu City` : 'Cebu City'}
+              </h3>
+              <p style={{fontSize:12,color:'#64748b',margin:0}}>
+                Real GPS locations of sitios, flood-risk areas, MRF, and barangay hall. Click any pin for details.
+              </p>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setShowRoutes(r => !r)}
+                style={{background: showRoutes ? '#dbeafe' : undefined, color: showRoutes ? '#1d4ed8' : undefined, borderColor: showRoutes ? '#93c5fd' : undefined}}
+              >
+                <MapPin size={13}/> {showRoutes ? 'Hide Routes' : 'Show Evacuation Routes'}
+              </button>
+            </div>
+          </div>
+
+          {/* Stat ribbon above map */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+            {[
+              {label:'Evacuation Centers', value: centers.length,                                          color:'#3b82f6', bg:'#eff6ff'},
+              {label:'Active Alerts',      value: alerts.filter(a=>a&&a.status==='Active').length,         color:'#ef4444', bg:'#fef2f2'},
+              {label:'Flood Risk Sitios',  value: gpsPoints.filter(p=>p.floodRisk).length,                color:'#d97706', bg:'#fffbeb'},
+              {label:'Vulnerable Mapped',  value: vulnerables.length,                                     color:'#7c3aed', bg:'#f5f3ff'},
+            ].map(s=>(
+              <div key={s.label} style={{background:s.bg,borderRadius:10,padding:'10px 14px'}}>
+                <div style={{fontSize:22,fontWeight:700,color:s.color}}>{s.value}</div>
+                <div style={{fontSize:11,color:'#64748b',marginTop:2}}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Real Leaflet map */}
+          {gpsPoints.length === 0 ? (
+            <div style={{textAlign:'center',padding:'60px 20px',background:'#f8fafc',borderRadius:12,border:'1px solid #e2e8f0'}}>
+              <Map size={48} style={{color:'#cbd5e1',display:'block',margin:'0 auto 14px'}}/>
+              <h4 style={{fontSize:15,fontWeight:600,color:'#374151',marginBottom:6}}>No barangay selected</h4>
+              <p style={{fontSize:13,color:'#94a3b8',maxWidth:320,margin:'0 auto 16px',lineHeight:1.6}}>
+                Go to Settings and select your barangay to see the real map with sitio pins, flood zones, and evacuation routes.
+              </p>
+              <button className="btn btn-primary btn-sm" onClick={()=>window.location.href='/settings'}>
+                Go to Settings
+              </button>
+            </div>
+          ) : (
+            <BarangayMap
+              barangayName={barangayName}
+              points={drrmMapPoints}
+              center={center}
+              mode="drrm"
+              height={480}
+              showRoute={showRoutes}
+              routePoints={showRoutes ? allRoutePoints : []}
+            />
+          )}
+
+          {/* Flood risk legend + info */}
+          {gpsPoints.some(p => p.floodRisk || p.coastal) && (
+            <div style={{marginTop:14,display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              <div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:10,padding:'14px 16px'}}>
+                <p style={{fontSize:12,fontWeight:700,color:'#991b1b',marginBottom:8}}>Flood Risk Areas in {barangayName||'Barangay'}</p>
+                {gpsPoints.filter(p=>p.floodRisk).map((p,i)=>(
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#dc2626',marginBottom:5}}>
+                    <div style={{width:8,height:8,borderRadius:'50%',background:'#dc2626',flexShrink:0}}/>
+                    {p.label} — low-lying, flood-prone
+                  </div>
+                ))}
+                {gpsPoints.filter(p=>p.floodRisk).length === 0 && (
+                  <p style={{fontSize:12,color:'#94a3b8'}}>No flood risk areas tagged for this barangay.</p>
+                )}
+              </div>
+              <div style={{background:'#ecfeff',border:'1px solid #a5f3fc',borderRadius:10,padding:'14px 16px'}}>
+                <p style={{fontSize:12,fontWeight:700,color:'#0e7490',marginBottom:8}}>Coastal / Storm Surge Areas</p>
+                {gpsPoints.filter(p=>p.coastal).map((p,i)=>(
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#0891b2',marginBottom:5}}>
+                    <div style={{width:8,height:8,borderRadius:'50%',background:'#06b6d4',flexShrink:0}}/>
+                    {p.label} — coastal, storm surge risk
+                  </div>
+                ))}
+                {gpsPoints.filter(p=>p.coastal).length === 0 && (
+                  <p style={{fontSize:12,color:'#94a3b8'}}>No coastal areas tagged for this barangay.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Evacuation routes text guide */}
+          {showRoutes && allRoutePoints.length > 0 && (
+            <div style={{marginTop:14,background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:10,padding:'14px 16px'}}>
+              <p style={{fontSize:12,fontWeight:700,color:'#1e40af',marginBottom:10}}>Evacuation Route Plan — {barangayName}</p>
+              <p style={{fontSize:12,color:'#374151',marginBottom:8,lineHeight:1.6}}>
+                Route shown on map: all sitios proceed to the Barangay Hall assembly point. Flood-risk sitios should use elevated paths when water level rises.
+              </p>
+              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {allRoutePoints.filter((_,i)=>i>0&&i<allRoutePoints.length-1).map((p,i)=>(
+                  <span key={i} style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'#dbeafe',color:'#1e40af',fontWeight:500}}>
+                    {i+1}. {p.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ALERTS */}
       {tab==='alerts'&&(
@@ -417,116 +581,310 @@ export default function DRRM() {
           </div>
           <div style={{marginTop:20,padding:'18px 22px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:14}}>
             <h4 style={{fontSize:14,fontWeight:700,color:'#1e40af',margin:'0 0 10px',display:'flex',alignItems:'center',gap:8}}><MapPin size={16}/>Evacuation Routes</h4>
-            {[{purok:'Purok 1-3',route:'Proceed to Barangay Hall via Main Road. Avoid low-lying areas near the creek.'},{purok:'Purok 4-6',route:'Go to Elementary School via the highland footpath behind Purok 5.'},{purok:'Purok 7-10',route:'Use alternate road through Purok 8 to reach the covered court.'}].map((r,i)=>(
-              <div key={i} style={{background:'#fff',borderRadius:9,padding:'10px 14px',border:'1px solid #bfdbfe',marginBottom:i<2?8:0}}>
-                <span style={{fontSize:12,fontWeight:700,color:'#1d4ed8',marginRight:8}}>{r.purok}:</span>
-                <span style={{fontSize:13,color:'#374151'}}>{r.route}</span>
-              </div>
-            ))}
+            <p style={{fontSize:13,color:'#374151',margin:'0 0 12px',lineHeight:1.6}}>View real GPS evacuation routes on the interactive Emergency Map. Shows flood-risk zones and the route to the assembly point.</p>
+            <button className="btn btn-primary btn-sm" onClick={()=>setTab('map')}><Map size={14}/> Open Emergency Map</button>
           </div>
         </div>
       )}
 
-      {/* MODAL: Alert */}
+      {/* ── MODAL: Send Alert ── */}
       {showA&&(
-        <ModalCard title="Send Emergency Alert" onClose={()=>setShowA(false)} maxWidth={540}>
-          {aErr&&<div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:9,padding:'9px 14px',marginBottom:14,fontSize:13,color:'#dc2626'}}>{aErr}</div>}
-          <FG label="Alert Level" required><select className="form-select" value={aF.level} onChange={e=>setAF(p=>({...p,level:e.target.value}))}>{ALERT_LEVELS.map(l=><option key={l} value={l}>{l.charAt(0).toUpperCase()+l.slice(1)}</option>)}</select></FG>
-          <FG label="Title" required><input className="form-input" value={aF.title} onChange={e=>setAF(p=>({...p,title:e.target.value}))} placeholder="e.g. Typhoon Warning"/></FG>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-            <FG label="Audience"><input className="form-input" value={aF.audience} onChange={e=>setAF(p=>({...p,audience:e.target.value}))}/></FG>
-            <FG label="Affected Area"><input className="form-input" value={aF.location} onChange={e=>setAF(p=>({...p,location:e.target.value}))}/></FG>
-          </div>
-          <FG label="Message" required><textarea className="form-textarea" rows={4} value={aF.message} onChange={e=>setAF(p=>({...p,message:e.target.value}))} placeholder="Detailed alert message..."/></FG>
-          <FG label="Safety Instructions"><textarea className="form-textarea" rows={2} value={aF.instructions} onChange={e=>setAF(p=>({...p,instructions:e.target.value}))} placeholder="What should residents do?"/></FG>
-          <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:4}}>
-            <button className="btn btn-secondary btn-md" onClick={()=>setShowA(false)} disabled={aLoad}>Cancel</button>
-            <button className="btn btn-primary btn-md" onClick={saveAlert} disabled={aLoad}>{aLoad?<><Loader size={14} className="animate-spin"/>Sending...</>:<><Bell size={14}/>Send Alert</>}</button>
-          </div>
-        </ModalCard>
-      )}
+        <ModalCard
+          title="Send Emergency Alert"
+          subtitle="Notify residents of an emergency situation"
+          icon={Bell}
+          headerGradient="linear-gradient(135deg, #991B1B 0%, #EF4444 100%)"
+          onClose={()=>setShowA(false)}
+          maxWidth={560}
+        >
+          {aErr&&<div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 14px',background:'#FEF2F2',border:'1.5px solid #FECACA',borderRadius:10,fontSize:13,color:'#DC2626',fontWeight:500}}><AlertCircle size={14}/>{aErr}</div>}
 
-      {/* MODAL: Center */}
-      {showC&&(
-        <ModalCard title={editC?'Edit Center':'Add Evacuation Center'} onClose={()=>{setShowC(false);setEditC(null);}} maxWidth={480}>
-          {cErr&&<div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:9,padding:'9px 14px',marginBottom:14,fontSize:13,color:'#dc2626'}}>{cErr}</div>}
-          <FG label="Center Name" required><input className="form-input" value={cF.name} onChange={e=>setCF(p=>({...p,name:e.target.value}))} placeholder="e.g. Barangay Hall"/></FG>
-          <FG label="Location"><input className="form-input" value={cF.location} onChange={e=>setCF(p=>({...p,location:e.target.value}))} placeholder="e.g. Main Road, Purok 1"/></FG>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-            <FG label="Max Capacity" required><input type="number" className="form-input" value={cF.capacity} onChange={e=>setCF(p=>({...p,capacity:e.target.value}))} min="1"/></FG>
-            <FG label="Status"><select className="form-select" value={cF.status} onChange={e=>setCF(p=>({...p,status:e.target.value}))}>{CENTER_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></FG>
+          {/* Alert level selector — visual cards */}
+          <div>
+            <label className="form-label">Alert Level <span style={{color:'#EF4444'}}>*</span></label>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+              {[
+                {val:'advisory', label:'Advisory',   desc:'Precautionary info',  bg:'#EFF6FF', color:'#1D4ED8', border:'#BFDBFE'},
+                {val:'warning',  label:'Warning',    desc:'Moderate risk',        bg:'#FFFBEB', color:'#92400E', border:'#FDE68A'},
+                {val:'critical', label:'Critical',   desc:'Immediate danger',     bg:'#FEF2F2', color:'#991B1B', border:'#FECACA'},
+              ].map(l=>(
+                <button key={l.val} type="button"
+                  onClick={()=>setAF(p=>({...p,level:l.val}))}
+                  style={{padding:'10px 10px',borderRadius:11,border:'2px solid '+(aF.level===l.val?l.color:l.border),background:aF.level===l.val?l.bg:'#fff',cursor:'pointer',textAlign:'center',transition:'all 0.15s',boxShadow:aF.level===l.val?`0 0 0 3px ${l.color}22`:'none'}}>
+                  <div style={{fontSize:13,fontWeight:700,color:aF.level===l.val?l.color:'#374151',marginBottom:2}}>{l.label}</div>
+                  <div style={{fontSize:11,color:'#94A3B8'}}>{l.desc}</div>
+                </button>
+              ))}
+            </div>
           </div>
-          <FG label="Amenities"><input className="form-input" value={cF.amenities} onChange={e=>setCF(p=>({...p,amenities:e.target.value}))} placeholder="e.g. Has water, CR, electricity"/></FG>
-          <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:4}}>
-            <button className="btn btn-secondary btn-md" onClick={()=>{setShowC(false);setEditC(null);}} disabled={cLoad}>Cancel</button>
-            <button className="btn btn-primary btn-md" onClick={saveCenter} disabled={cLoad}>{cLoad?<><Loader size={14} className="animate-spin"/>Saving...</>:<><Save size={14}/>{editC?'Update':'Add Center'}</>}</button>
-          </div>
-        </ModalCard>
-      )}
 
-      {/* MODAL: Occupancy */}
-      {showO&&oC&&(
-        <ModalCard title={'Update Occupancy — '+(oC.name||'')} onClose={()=>{setShowO(false);setOC(null);}} maxWidth={360}>
-          <FG label={'Current Evacuees (max '+(oC.capacity||0)+')'}>
-            <input type="number" className="form-input" value={oV} onChange={e=>setOV(e.target.value)} min="0" max={oC.capacity||undefined}/>
+          <FG label="Title" required>
+            <input className="form-input" value={aF.title} onChange={e=>setAF(p=>({...p,title:e.target.value}))} placeholder="e.g. Typhoon Odette Warning"/>
           </FG>
-          {Number(oV)>Number(oC.capacity||0)&&<p style={{fontSize:12,color:'#dc2626',margin:'4px 0 0'}}>Exceeds maximum capacity</p>}
-          <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <FG label="Audience" hint="Who should receive this alert">
+              <input className="form-input" value={aF.audience} onChange={e=>setAF(p=>({...p,audience:e.target.value}))} placeholder="All Residents"/>
+            </FG>
+            <FG label="Affected Area">
+              <input className="form-input" value={aF.location} onChange={e=>setAF(p=>({...p,location:e.target.value}))} placeholder="e.g. Purok 3, Riverside"/>
+            </FG>
+          </div>
+          <FG label="Message" required hint="Describe the emergency clearly and concisely">
+            <textarea className="form-textarea" rows={4} value={aF.message} onChange={e=>setAF(p=>({...p,message:e.target.value}))} placeholder="Explain the emergency situation, what happened, and the current status..."/>
+          </FG>
+          <FG label="Safety Instructions" hint="What should residents do right now?">
+            <textarea className="form-textarea" rows={2} value={aF.instructions} onChange={e=>setAF(p=>({...p,instructions:e.target.value}))} placeholder="e.g. Evacuate immediately to the nearest evacuation center. Bring essential items only."/>
+          </FG>
+
+          <div style={{display:'flex',justifyContent:'flex-end',gap:10,paddingTop:4,borderTop:'1.5px solid #F0F4F8',marginTop:4}}>
+            <button className="btn btn-secondary btn-md" onClick={()=>setShowA(false)} disabled={aLoad}>Cancel</button>
+            <button className="btn btn-md" onClick={saveAlert} disabled={aLoad}
+              style={{background:'linear-gradient(135deg,#DC2626,#EF4444)',color:'#fff',border:'none',display:'flex',alignItems:'center',gap:7,padding:'10px 20px',borderRadius:10,fontSize:14,fontWeight:600,cursor:'pointer',boxShadow:'0 2px 10px rgba(220,38,38,0.30)'}}>
+              {aLoad?<><Loader size={14} className="animate-spin"/>Sending...</>:<><Bell size={14}/>Send Alert</>}
+            </button>
+          </div>
+        </ModalCard>
+      )}
+
+      {/* ── MODAL: Evacuation Center ── */}
+      {showC&&(
+        <ModalCard
+          title={editC ? 'Edit Evacuation Center' : 'Add Evacuation Center'}
+          subtitle={editC ? 'Update center details and capacity' : 'Register a new emergency evacuation center'}
+          icon={Home}
+          headerGradient="linear-gradient(135deg, #065F46 0%, #10B981 100%)"
+          onClose={()=>{setShowC(false);setEditC(null);}}
+          maxWidth={500}
+        >
+          {cErr&&<div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 14px',background:'#FEF2F2',border:'1.5px solid #FECACA',borderRadius:10,fontSize:13,color:'#DC2626',fontWeight:500}}><AlertCircle size={14}/>{cErr}</div>}
+
+          <FG label="Center Name" required hint="Official name of the evacuation center">
+            <input className="form-input" value={cF.name} onChange={e=>setCF(p=>({...p,name:e.target.value}))} placeholder="e.g. Barangay Hall Evacuation Center"/>
+          </FG>
+          <FG label="Location / Address" hint="Street, landmark, or purok">
+            <input className="form-input" value={cF.location} onChange={e=>setCF(p=>({...p,location:e.target.value}))} placeholder="e.g. Main Road, Purok 1 near the chapel"/>
+          </FG>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <FG label="Max Capacity" required hint="Maximum number of evacuees">
+              <input type="number" className="form-input" value={cF.capacity} onChange={e=>setCF(p=>({...p,capacity:e.target.value}))} min="1" placeholder="e.g. 200"/>
+            </FG>
+            <div>
+              <label className="form-label">Status</label>
+              <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:2}}>
+                {CENTER_STATUSES.map(s=>{
+                  const colors={Standby:{bg:'#F1F5F9',color:'#475569',border:'#CBD5E1'},Active:{bg:'#D1FAE5',color:'#065F46',border:'#6EE7B7'},Full:{bg:'#FEE2E2',color:'#991B1B',border:'#FCA5A5'},Closed:{bg:'#F3F4F6',color:'#6B7280',border:'#D1D5DB'}}[s];
+                  return(
+                    <button key={s} type="button" onClick={()=>setCF(p=>({...p,status:s}))}
+                      style={{padding:'7px 12px',borderRadius:9,border:'2px solid '+(cF.status===s?colors.color:colors.border),background:cF.status===s?colors.bg:'#fff',color:cF.status===s?colors.color:'#64748B',fontSize:12.5,fontWeight:cF.status===s?700:500,cursor:'pointer',textAlign:'left',transition:'all 0.12s'}}>
+                      {s}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <FG label="Amenities Available" hint="Comma-separated list of available facilities">
+            <input className="form-input" value={cF.amenities} onChange={e=>setCF(p=>({...p,amenities:e.target.value}))} placeholder="e.g. Running water, CR, Electricity, Medical area"/>
+          </FG>
+
+          <div style={{display:'flex',justifyContent:'flex-end',gap:10,paddingTop:4,borderTop:'1.5px solid #F0F4F8',marginTop:4}}>
+            <button className="btn btn-secondary btn-md" onClick={()=>{setShowC(false);setEditC(null);}} disabled={cLoad}>Cancel</button>
+            <button className="btn btn-md" onClick={saveCenter} disabled={cLoad}
+              style={{background:'linear-gradient(135deg,#059669,#10B981)',color:'#fff',border:'none',display:'flex',alignItems:'center',gap:7,padding:'10px 20px',borderRadius:10,fontSize:14,fontWeight:600,cursor:'pointer',boxShadow:'0 2px 10px rgba(5,150,105,0.28)'}}>
+              {cLoad?<><Loader size={14} className="animate-spin"/>Saving...</>:<><Save size={14}/>{editC?'Update Center':'Add Center'}</>}
+            </button>
+          </div>
+        </ModalCard>
+      )}
+
+      {/* ── MODAL: Update Occupancy ── */}
+      {showO&&oC&&(
+        <ModalCard
+          title="Update Occupancy"
+          subtitle={`${oC.name || 'Evacuation Center'}`}
+          icon={Users}
+          headerGradient="linear-gradient(135deg, #0369A1 0%, #0EA5E9 100%)"
+          onClose={()=>{setShowO(false);setOC(null);}}
+          maxWidth={380}
+        >
+          <div style={{background:'#F8FAFC',border:'1.5px solid #F0F4F8',borderRadius:12,padding:'16px 18px'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <span style={{fontSize:13,fontWeight:600,color:'#374151'}}>Current capacity</span>
+              <span style={{fontSize:13,fontWeight:700,color:'#0F172A'}}>{Number(oV)||0} / {oC.capacity||0}</span>
+            </div>
+            {(()=>{
+              const pct=oC.capacity>0?Math.min(100,Math.round(((Number(oV)||0)/oC.capacity)*100)):0;
+              const barClr=pct>=90?'#EF4444':pct>=60?'#F59E0B':'#10B981';
+              return(<><div style={{height:10,background:'#E2E8F0',borderRadius:100,overflow:'hidden',marginBottom:6}}><div style={{height:'100%',width:pct+'%',background:barClr,borderRadius:100,transition:'width 0.4s'}}/></div><div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#94A3B8'}}><span>{pct}% full</span><span style={{color:barClr,fontWeight:700}}>{pct>=90?'FULL / CRITICAL':pct>=60?'High occupancy':'Available'}</span></div></>);
+            })()}
+          </div>
+          <FG label={`Number of Evacuees (max ${oC.capacity||0})`} required hint="Current number of people inside the center">
+            <input type="number" className="form-input" value={oV} onChange={e=>setOV(e.target.value)} min="0" max={oC.capacity||undefined} style={{fontSize:18,fontWeight:700,textAlign:'center'}}/>
+          </FG>
+          {Number(oV)>Number(oC.capacity||0)&&(
+            <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 13px',background:'#FEF2F2',border:'1.5px solid #FECACA',borderRadius:10,fontSize:13,color:'#DC2626',fontWeight:600}}>
+              <AlertTriangle size={14}/> Exceeds maximum capacity of {oC.capacity}
+            </div>
+          )}
+          <div style={{display:'flex',justifyContent:'flex-end',gap:10,paddingTop:4,borderTop:'1.5px solid #F0F4F8',marginTop:4}}>
             <button className="btn btn-secondary btn-md" onClick={()=>{setShowO(false);setOC(null);}}>Cancel</button>
-            <button className="btn btn-primary btn-md" onClick={saveOcc} disabled={oLoad}>{oLoad?<><Loader size={14} className="animate-spin"/>Saving...</>:<><Save size={14}/>Update</>}</button>
+            <button className="btn btn-md" onClick={saveOcc} disabled={oLoad} style={{background:'linear-gradient(135deg,#0369A1,#0EA5E9)',color:'#fff',border:'none',display:'flex',alignItems:'center',gap:7,padding:'10px 20px',borderRadius:10,fontSize:14,fontWeight:600,cursor:'pointer'}}>
+              {oLoad?<><Loader size={14} className="animate-spin"/>Saving...</>:<><Save size={14}/>Update</>}
+            </button>
           </div>
         </ModalCard>
       )}
 
-      {/* MODAL: Vulnerable */}
+      {/* ── MODAL: Vulnerable Resident ── */}
       {showV&&(
-        <ModalCard title="Add Vulnerable Resident" onClose={()=>setShowV(false)} maxWidth={480}>
-          <FG label="Full Name" required><input className="form-input" value={vF.name} onChange={e=>setVF(p=>({...p,name:e.target.value}))} placeholder="Juan Dela Cruz"/></FG>
+        <ModalCard
+          title="Add Vulnerable Resident"
+          subtitle="Register a resident needing special emergency assistance"
+          icon={Users}
+          headerGradient="linear-gradient(135deg, #5B21B6 0%, #8B5CF6 100%)"
+          onClose={()=>setShowV(false)}
+          maxWidth={500}
+        >
+          <FG label="Full Name" required hint="Resident's complete name">
+            <input className="form-input" value={vF.name} onChange={e=>setVF(p=>({...p,name:e.target.value}))} placeholder="e.g. Maria Santos"/>
+          </FG>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-            <FG label="Purok"><select className="form-select" value={vF.purok} onChange={e=>setVF(p=>({...p,purok:e.target.value}))}><option value="">Select</option>{PUROKS.map(p=><option key={p} value={p}>{p}</option>)}</select></FG>
-            <FG label="Category"><select className="form-select" value={vF.category} onChange={e=>setVF(p=>({...p,category:e.target.value}))}>{VULN_CATS.map(c=><option key={c} value={c}>{c}</option>)}</select></FG>
+            <FG label="Purok / Sitio">
+              <select className="form-select" value={vF.purok} onChange={e=>setVF(p=>({...p,purok:e.target.value}))}>
+                <option value="">Select purok</option>
+                {PUROKS.map(p=><option key={p} value={p}>{p}</option>)}
+              </select>
+            </FG>
+            <FG label="Vulnerability Category">
+              <select className="form-select" value={vF.category} onChange={e=>setVF(p=>({...p,category:e.target.value}))}>
+                {VULN_CATS.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </FG>
           </div>
-          <FG label="Contact"><input className="form-input" value={vF.contact} onChange={e=>setVF(p=>({...p,contact:e.target.value}))} placeholder="09XX XXX XXXX"/></FG>
-          <FG label="Notes / Special Needs"><textarea className="form-textarea" rows={2} value={vF.notes} onChange={e=>setVF(p=>({...p,notes:e.target.value}))} placeholder="e.g. Uses wheelchair..."/></FG>
-          <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:4}}>
+          {/* Category badge preview */}
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:'#F5F3FF',border:'1.5px solid #DDD6FE',borderRadius:10}}>
+            <Shield size={14} color="#7C3AED"/>
+            <span style={{fontSize:12.5,color:'#5B21B6',fontWeight:600}}>Category:</span>
+            <span style={{fontSize:12.5,color:'#6D28D9',fontWeight:500}}>{vF.category}</span>
+          </div>
+          <FG label="Emergency Contact Number" hint="Mobile number for emergency coordination">
+            <input className="form-input" value={vF.contact} onChange={e=>setVF(p=>({...p,contact:e.target.value}))} placeholder="09XX XXX XXXX"/>
+          </FG>
+          <FG label="Special Needs / Notes" hint="Medical conditions, mobility issues, required assistance">
+            <textarea className="form-textarea" rows={3} value={vF.notes} onChange={e=>setVF(p=>({...p,notes:e.target.value}))} placeholder="e.g. Uses wheelchair, requires oxygen support, hearing impaired..."/>
+          </FG>
+          <div style={{display:'flex',justifyContent:'flex-end',gap:10,paddingTop:4,borderTop:'1.5px solid #F0F4F8',marginTop:4}}>
             <button className="btn btn-secondary btn-md" onClick={()=>setShowV(false)} disabled={vLoad}>Cancel</button>
-            <button className="btn btn-primary btn-md" onClick={saveVuln} disabled={vLoad||!vF.name.trim()}>{vLoad?<><Loader size={14} className="animate-spin"/>Saving...</>:<><Save size={14}/>Save Profile</>}</button>
+            <button className="btn btn-md" onClick={saveVuln} disabled={vLoad||!vF.name.trim()}
+              style={{background:'linear-gradient(135deg,#5B21B6,#8B5CF6)',color:'#fff',border:'none',display:'flex',alignItems:'center',gap:7,padding:'10px 20px',borderRadius:10,fontSize:14,fontWeight:600,cursor:'pointer',boxShadow:'0 2px 10px rgba(91,33,182,0.25)',opacity:!vF.name.trim()?0.5:1}}>
+              {vLoad?<><Loader size={14} className="animate-spin"/>Saving...</>:<><Save size={14}/>Save Profile</>}
+            </button>
           </div>
         </ModalCard>
       )}
 
-      {/* MODAL: Damage */}
+      {/* ── MODAL: Damage Report ── */}
       {showD&&(
-        <ModalCard title="Log Damage Report" onClose={()=>setShowD(false)} maxWidth={500}>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-            <FG label="Type"><select className="form-select" value={dF.type} onChange={e=>setDF(p=>({...p,type:e.target.value}))}>{DAMAGE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></FG>
-            <FG label="Severity"><select className="form-select" value={dF.severity} onChange={e=>setDF(p=>({...p,severity:e.target.value}))}>{DAMAGE_SEV.map(s=><option key={s} value={s}>{s}</option>)}</select></FG>
+        <ModalCard
+          title="Log Damage Report"
+          subtitle="Record infrastructure or property damage after a disaster"
+          icon={ClipboardList}
+          headerGradient="linear-gradient(135deg, #92400E 0%, #F59E0B 100%)"
+          onClose={()=>setShowD(false)}
+          maxWidth={520}
+        >
+          {/* Severity visual selector */}
+          <div>
+            <label className="form-label">Severity <span style={{color:'#EF4444'}}>*</span></label>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+              {[
+                {val:'Minor',      label:'Minor',      desc:'Repairable',   color:'#2563EB', bg:'#EFF6FF', border:'#BFDBFE'},
+                {val:'Moderate',   label:'Moderate',   desc:'Significant',  color:'#D97706', bg:'#FFFBEB', border:'#FDE68A'},
+                {val:'Severe',     label:'Severe',     desc:'Major damage', color:'#DC2626', bg:'#FEF2F2', border:'#FECACA'},
+                {val:'Total Loss', label:'Total Loss', desc:'Destroyed',    color:'#7C3AED', bg:'#F5F3FF', border:'#DDD6FE'},
+              ].map(s=>(
+                <button key={s.val} type="button" onClick={()=>setDF(p=>({...p,severity:s.val}))}
+                  style={{padding:'9px 6px',borderRadius:10,border:'2px solid '+(dF.severity===s.val?s.color:s.border),background:dF.severity===s.val?s.bg:'#fff',cursor:'pointer',textAlign:'center',transition:'all 0.15s',boxShadow:dF.severity===s.val?`0 0 0 3px ${s.color}22`:'none'}}>
+                  <div style={{fontSize:12,fontWeight:700,color:dF.severity===s.val?s.color:'#374151',marginBottom:2}}>{s.label}</div>
+                  <div style={{fontSize:10.5,color:'#94A3B8'}}>{s.desc}</div>
+                </button>
+              ))}
+            </div>
           </div>
-          <FG label="Location" required><input className="form-input" value={dF.location} onChange={e=>setDF(p=>({...p,location:e.target.value}))} placeholder="e.g. 123 Rizal St., Purok 3"/></FG>
-          <FG label="Description"><textarea className="form-textarea" rows={2} value={dF.description} onChange={e=>setDF(p=>({...p,description:e.target.value}))} placeholder="Describe the damage..."/></FG>
+
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-            <FG label="Affected Families"><input type="number" className="form-input" value={dF.affectedFamilies} onChange={e=>setDF(p=>({...p,affectedFamilies:e.target.value}))} min="0"/></FG>
-            <FG label="Estimated Cost (PHP)"><input type="number" className="form-input" value={dF.estimatedCost} onChange={e=>setDF(p=>({...p,estimatedCost:e.target.value}))} min="0"/></FG>
+            <FG label="Damage Type" required>
+              <select className="form-select" value={dF.type} onChange={e=>setDF(p=>({...p,type:e.target.value}))}>
+                {DAMAGE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </FG>
+            <FG label="Exact Location" required hint="Street, purok, landmark">
+              <input className="form-input" value={dF.location} onChange={e=>setDF(p=>({...p,location:e.target.value}))} placeholder="e.g. Purok 3, near the bridge"/>
+            </FG>
           </div>
-          <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:4}}>
+          <FG label="Description" hint="Describe the extent and nature of the damage">
+            <textarea className="form-textarea" rows={3} value={dF.description} onChange={e=>setDF(p=>({...p,description:e.target.value}))} placeholder="Describe what was damaged, how it happened, and current condition..."/>
+          </FG>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <FG label="Affected Families" hint="Number of families impacted">
+              <input type="number" className="form-input" value={dF.affectedFamilies} onChange={e=>setDF(p=>({...p,affectedFamilies:e.target.value}))} min="0" placeholder="0"/>
+            </FG>
+            <FG label="Estimated Cost (₱)" hint="Rough repair/replacement cost">
+              <input type="number" className="form-input" value={dF.estimatedCost} onChange={e=>setDF(p=>({...p,estimatedCost:e.target.value}))} min="0" placeholder="0"/>
+            </FG>
+          </div>
+          <div style={{display:'flex',justifyContent:'flex-end',gap:10,paddingTop:4,borderTop:'1.5px solid #F0F4F8',marginTop:4}}>
             <button className="btn btn-secondary btn-md" onClick={()=>setShowD(false)} disabled={dLoad}>Cancel</button>
-            <button className="btn btn-primary btn-md" onClick={saveDmg} disabled={dLoad||!dF.location.trim()}>{dLoad?<><Loader size={14} className="animate-spin"/>Saving...</>:<><Save size={14}/>Submit</>}</button>
+            <button className="btn btn-md" onClick={saveDmg} disabled={dLoad||!dF.location.trim()}
+              style={{background:'linear-gradient(135deg,#92400E,#F59E0B)',color:'#fff',border:'none',display:'flex',alignItems:'center',gap:7,padding:'10px 20px',borderRadius:10,fontSize:14,fontWeight:600,cursor:'pointer',boxShadow:'0 2px 10px rgba(217,119,6,0.28)',opacity:!dF.location.trim()?0.5:1}}>
+              {dLoad?<><Loader size={14} className="animate-spin"/>Saving...</>:<><FileText size={14}/>Submit Report</>}
+            </button>
           </div>
         </ModalCard>
       )}
 
-      {/* MODAL: Task */}
+      {/* ── MODAL: Incident Task ── */}
       {showT&&(
-        <ModalCard title="Assign Emergency Task" onClose={()=>setShowT(false)} maxWidth={460}>
-          <FG label="Task" required><input className="form-input" value={tF.title} onChange={e=>setTF(p=>({...p,title:e.target.value}))} placeholder="e.g. Distribute relief goods to Purok 3"/></FG>
+        <ModalCard
+          title="Assign Emergency Task"
+          subtitle="Delegate a response task to a barangay team member"
+          icon={Shield}
+          headerGradient="linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)"
+          onClose={()=>setShowT(false)}
+          maxWidth={480}
+        >
+          <FG label="Task Description" required hint="Be specific about what needs to be done">
+            <input className="form-input" value={tF.title} onChange={e=>setTF(p=>({...p,title:e.target.value}))} placeholder="e.g. Distribute relief goods to all families in Purok 3"/>
+          </FG>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-            <FG label="Assigned To"><input className="form-input" value={tF.assignedTo} onChange={e=>setTF(p=>({...p,assignedTo:e.target.value}))} placeholder="e.g. Kagawad Santos"/></FG>
-            <FG label="Priority"><select className="form-select" value={tF.priority} onChange={e=>setTF(p=>({...p,priority:e.target.value}))}>{['High','Medium','Low'].map(p=><option key={p} value={p}>{p}</option>)}</select></FG>
+            <FG label="Assigned To" hint="Person responsible for this task">
+              <input className="form-input" value={tF.assignedTo} onChange={e=>setTF(p=>({...p,assignedTo:e.target.value}))} placeholder="e.g. Kagawad Santos"/>
+            </FG>
+            <div>
+              <label className="form-label">Priority</label>
+              <div style={{display:'flex',gap:6,marginTop:2}}>
+                {[
+                  {val:'High',   color:'#DC2626', bg:'#FEF2F2', border:'#FECACA'},
+                  {val:'Medium', color:'#D97706', bg:'#FFFBEB', border:'#FDE68A'},
+                  {val:'Low',    color:'#059669', bg:'#ECFDF5', border:'#A7F3D0'},
+                ].map(p=>(
+                  <button key={p.val} type="button" onClick={()=>setTF(f=>({...f,priority:p.val}))}
+                    style={{flex:1,padding:'8px 4px',borderRadius:9,border:'2px solid '+(tF.priority===p.val?p.color:p.border),background:tF.priority===p.val?p.bg:'#fff',color:tF.priority===p.val?p.color:'#64748B',fontSize:12,fontWeight:tF.priority===p.val?700:500,cursor:'pointer',transition:'all 0.12s'}}>
+                    {p.val}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-          <FG label="Notes"><textarea className="form-textarea" rows={2} value={tF.notes} onChange={e=>setTF(p=>({...p,notes:e.target.value}))} placeholder="Additional instructions..."/></FG>
-          <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:4}}>
+          <FG label="Instructions / Notes" hint="Additional context or step-by-step directions">
+            <textarea className="form-textarea" rows={3} value={tF.notes} onChange={e=>setTF(p=>({...p,notes:e.target.value}))} placeholder="e.g. Coordinate with Purok Leader Reyes. Bring the manifold form."/>
+          </FG>
+          <div style={{display:'flex',justifyContent:'flex-end',gap:10,paddingTop:4,borderTop:'1.5px solid #F0F4F8',marginTop:4}}>
             <button className="btn btn-secondary btn-md" onClick={()=>setShowT(false)} disabled={tLoad}>Cancel</button>
-            <button className="btn btn-primary btn-md" onClick={saveTask} disabled={tLoad||!tF.title.trim()}>{tLoad?<><Loader size={14} className="animate-spin"/>Saving...</>:<><Save size={14}/>Assign</>}</button>
+            <button className="btn btn-md" onClick={saveTask} disabled={tLoad||!tF.title.trim()}
+              style={{background:'linear-gradient(135deg,#1E3A8A,#3B82F6)',color:'#fff',border:'none',display:'flex',alignItems:'center',gap:7,padding:'10px 20px',borderRadius:10,fontSize:14,fontWeight:600,cursor:'pointer',boxShadow:'0 2px 10px rgba(37,99,235,0.28)',opacity:!tF.title.trim()?0.5:1}}>
+              {tLoad?<><Loader size={14} className="animate-spin"/>Assigning...</>:<><ChevronRight size={14}/>Assign Task</>}
+            </button>
           </div>
         </ModalCard>
       )}
